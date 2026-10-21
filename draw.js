@@ -21,6 +21,7 @@ function draw() {
   for (let line = 0; line < HEIGHT; line += 8) ctx.fillRect(0, line, WIDTH, 1);
 
   drawPaddle();
+  drawParticles();
   for (const ball of balls) {
     ctx.beginPath();
     ctx.arc(ball.x + ball.width / 2, ball.y + ball.height / 2, ball.width / 2, 0, Math.PI * 2);
@@ -47,6 +48,19 @@ function draw() {
   drawBoardGuides();
   drawHud();
   if (gameMode === "gameover") drawGameOver();
+}
+
+function drawParticles() {
+  if (!particleEffectsEnabled) return;
+  for (const particle of particles) {
+    ctx.globalAlpha = Math.min(1, particle.life / particle.maxLife);
+    ctx.fillStyle = particle.color;
+    ctx.shadowColor = particle.color;
+    ctx.shadowBlur = 10;
+    ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
 }
 
 function drawBoardGuides() {

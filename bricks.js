@@ -20,6 +20,8 @@ const TETROMINO_SHAPES = [
 ];
 
 function createBrick(x, y, hitsRequired = 1, effect = null) {
+  const dropChance = Math.min(0.98, GAME_CONFIG.brainrots.dropChance * brainrotDropMultiplier);
+  const brainrotRarity = Math.random() < dropChance ? rollBrainrotRarity().name : null;
   return {
     x,
     y,
@@ -27,7 +29,8 @@ function createBrick(x, y, hitsRequired = 1, effect = null) {
     height: BRICK_HEIGHT,
     hitsRequired,
     hitsRemaining: hitsRequired,
-    effect
+    effect,
+    brainrotRarity
   };
 }
 
@@ -45,6 +48,14 @@ function drawBricks() {
     ctx.strokeStyle = "rgba(255,255,255,.8)";
     ctx.lineWidth = 2;
     ctx.strokeRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
+    if (brick.brainrotRarity) {
+      const rarity = brainrotRarities.find((item) => item.name === brick.brainrotRarity);
+      ctx.fillStyle = rarity.color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.font = "900 9px Impact, sans-serif";
+      ctx.fillText(brick.brainrotRarity.toUpperCase(), brick.x + brick.width / 2, brick.y + 5, brick.width - 6);
+    }
     ctx.fillStyle = "#10121a";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -52,6 +63,27 @@ function drawBricks() {
     const label = brick.effect || (brick.hitsRequired > 1 ? `x${brick.hitsRemaining}` : "BLOCK");
     ctx.fillText(label, brick.x + brick.width / 2, brick.y + brick.height / 2, brick.width - 4);
   }
+  drawFallingBrainrots();
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
+}
+
+function drawFallingBrainrots() {
+  for (const drop of fallingBrainrots) {
+    const image = getBrainrotImage(drop.brainrot.image);
+    ctx.save();
+    ctx.shadowColor = drop.brainrot.color;
+    ctx.shadowBlur = 12;
+    if (image.complete && image.naturalWidth > 0) {
+      ctx.drawImage(image, drop.x, drop.y, drop.width, drop.height);
+    } else {
+      ctx.fillStyle = drop.brainrot.color;
+      ctx.fillRect(drop.x, drop.y, drop.width, drop.height);
+    }
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = drop.brainrot.color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(drop.x, drop.y, drop.width, drop.height);
+    ctx.restore();
+  }
 }

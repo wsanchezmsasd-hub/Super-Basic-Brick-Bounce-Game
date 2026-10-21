@@ -69,13 +69,20 @@ const paddle = {
 let bricks = [];
 let enemyEntities = [];
 let brainrots = [];
+let fallingBrainrots = [];
 let cashBalance = 0;
 let factoryCapacity = 8;
 let factoryFloors = 1;
 let factoryMultiplier = 1;
 let brainrotIncomeMultiplier = 1;
 let brainrotDropMultiplier = 1;
-let customBrainrotImage = "";
+const brainrotImageCache = new Map();
+const particles = [];
+const SELL_VALUE_MULTIPLIER = 7;
+let viewMode = "title";
+let gameStarted = false;
+let particleEffectsEnabled = true;
+let gameSpeed = 1;
 let gameMode = "playing";
 let gameOverReason = "";
 
@@ -158,12 +165,12 @@ const upgrades = [
 ];
 
 const brainrotRarities = [
-  { name: "Brainrot God", chance: 1 / 256, color: "#ff3c8e", income: 18, sale: 160 },
-  { name: "Mythical", chance: 1 / 64, color: "#ff9b32", income: 7, sale: 60 },
-  { name: "Legendary", chance: 1 / 32, color: "#ffe14a", income: 3, sale: 25 },
-  { name: "Rare", chance: 1 / 10, color: "#46f0dc", income: 1.25, sale: 10 },
-  { name: "Uncommon", chance: 1 / 4, color: "#76ed5a", income: 0.55, sale: 4 },
-  { name: "Common", chance: 1 / 2, color: "#aeb6c2", income: 0.2, sale: 2 }
+  { name: "Brainrot God", brainrotName: "la vaca saturno saturnita", image: "brainrotgod.png", chance: 1 / 256, color: "#ff3c8e", income: 18, sale: 160 },
+  { name: "Mythical", brainrotName: "tralalelo tralala", image: "mythical.png", chance: 1 / 64, color: "#ff9b32", income: 7, sale: 60 },
+  { name: "Legendary", brainrotName: "bombodido crocodilo", image: "legendary.png", chance: 1 / 32, color: "#ffe14a", income: 3, sale: 25 },
+  { name: "Rare", brainrotName: "ballerina cappuccina", image: "rare.png", chance: 1 / 10, color: "#46f0dc", income: 1.25, sale: 10 },
+  { name: "Uncommon", brainrotName: "lirili larila", image: "uncommon.png", chance: 1 / 4, color: "#76ed5a", income: 0.55, sale: 4 },
+  { name: "Common", brainrotName: "Tung Tung Tung sahur", image: "common.png", chance: 1 / 2, color: "#aeb6c2", income: 0.2, sale: 2 }
 ];
 
 
@@ -175,11 +182,13 @@ function update() {
   enemiesSystem(enemyEntities);
   movePaddle();
   tickFactory();
+  updateParticles();
 
   if (gameMode === "gameover") {
     return;
   }
 
+  updateFallingBrainrots();
   updatePendingBallLaunches();
   positionHeldBalls();
   if (!volleyActive) {
@@ -274,7 +283,7 @@ function updateAim(event) {
 }
 
 function launchBalls() {
-  if (gameMode !== "playing" || volleyActive || balls.length === 0) return;
+  if (viewMode !== "game" || gameMode !== "playing" || volleyActive || balls.length === 0) return;
   let launchIndex = 0;
   for (const ball of balls) {
     if (ball.state !== "held") continue;
@@ -395,19 +404,89 @@ function rollBrainrotRarity() {
   return brainrotRarities[brainrotRarities.length - 1];
 }
 
-function createBrainrot() {
-  if (brainrots.length >= factoryCapacity) return;
-  const rarity = rollBrainrotRarity();
-  brainrots.push({
+function createBrainrot(rarityName) {
+  const rarity = brainrotRarities.find((item) => item.name === rarityName);
+  return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     rarity: rarity.name,
+    name: rarity.brainrotName,
+    defaultName: rarity.brainrotName,
     color: rarity.color,
     income: rarity.income,
     sale: rarity.sale,
     storedCash: 0,
-    image: customBrainrotImage
+    image: rarity.image
+  };
+}
+
+function spawnParticles(x, y, color, count = 12) {
+  if (!particleEffectsEnabled) return;
+  for (let index = 0; index < count; index++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      life: 24 + Math.random() * 18,
+      maxLife: 42,
+      color
+    });
+  }
+}
+
+function updateParticles() {
+  for (let index = particles.length - 1; index >= 0; index--) {
+    const particle = particles[index];
+    particle.x += particle.vx;
+    particle.y += particle.vy;
+    particle.vx *= 0.97;
+    particle.vy *= 0.97;
+    particle.life -= 1;
+    if (particle.life <= 0) particles.splice(index, 1);
+  }
+}
+
+function getBrainrotImage(source) {
+  if (!brainrotImageCache.has(source)) {
+    const image = new Image();
+    image.src = source;
+    brainrotImageCache.set(source, image);
+  }
+  return brainrotImageCache.get(source);
+}
+
+function spawnBrainrotDrop(rarityName, brick) {
+  fallingBrainrots.push({
+    brainrot: createBrainrot(rarityName),
+    x: brick.x + (brick.width - BRICK_WIDTH / 2) / 2,
+    y: brick.y + (brick.height - BRICK_WIDTH / 2) / 2,
+    width: BRICK_WIDTH / 2,
+    height: BRICK_WIDTH / 2,
+    velocityY: 0
   });
-  renderFactory();
+}
+
+function updateFallingBrainrots() {
+  for (let index = fallingBrainrots.length - 1; index >= 0; index--) {
+    const drop = fallingBrainrots[index];
+    drop.velocityY = Math.min(drop.velocityY + 0.12, 6);
+    drop.y += drop.velocityY;
+
+    if (boxesTouch(drop, paddle)) {
+      if (brainrots.length < factoryCapacity) {
+        brainrots.push(drop.brainrot);
+        spawnParticles(drop.x + drop.width / 2, drop.y + drop.height / 2, drop.brainrot.color, 18);
+        fallingBrainrots.splice(index, 1);
+        renderFactory();
+      }
+      continue;
+    }
+
+    if (drop.y > HEIGHT) fallingBrainrots.splice(index, 1);
+  }
 }
 
 function tickFactory() {
@@ -417,7 +496,15 @@ function tickFactory() {
   tickFactory.counter = 0;
   const multiplier = factoryMultiplier * brainrotIncomeMultiplier;
   for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
-  renderFactory();
+  const grid = document.getElementById("factory-grid");
+  for (const bank of grid.querySelectorAll("[data-bank]")) {
+    const brainrot = brainrots.find((item) => item.id === bank.dataset.bank);
+    if (brainrot) bank.textContent = `$${Math.floor(brainrot.storedCash).toLocaleString()} stored`;
+  }
+  for (const button of grid.querySelectorAll("[data-claim]")) {
+    const brainrot = brainrots.find((item) => item.id === button.dataset.claim);
+    if (brainrot) button.setAttribute("aria-label", `Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.name}`);
+  }
 }
 
 function claimBrainrot(id) {
@@ -431,13 +518,13 @@ function claimBrainrot(id) {
 function sellBrainrot(id) {
   const index = brainrots.findIndex((item) => item.id === id);
   if (index < 0) return;
-  cashBalance += brainrots[index].sale + Math.floor(brainrots[index].storedCash);
+  cashBalance += brainrots[index].sale * SELL_VALUE_MULTIPLIER + Math.floor(brainrots[index].storedCash);
   brainrots.splice(index, 1);
   renderFactory();
 }
 
 function sellAllBrainrots() {
-  for (const brainrot of brainrots) cashBalance += brainrot.sale + Math.floor(brainrot.storedCash);
+  for (const brainrot of brainrots) cashBalance += brainrot.sale * SELL_VALUE_MULTIPLIER + Math.floor(brainrot.storedCash);
   brainrots = [];
   renderFactory();
 }
@@ -455,10 +542,50 @@ function renderFactory() {
     const card = document.createElement("article");
     card.className = "brainrot";
     card.style.setProperty("--rarity", brainrot.color);
-    const image = brainrot.image
-      ? `<img src="${brainrot.image}" alt="${brainrot.rarity} brainrot">`
-      : `<span class="brainrot-glyph" aria-hidden="true">${brainrot.rarity === "Brainrot God" ? "★" : brainrot.rarity[0]}</span>`;
-    card.innerHTML = `<button class="brainrot-main" data-claim="${brainrot.id}" aria-label="Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.rarity}">${image}<strong>${brainrot.rarity}</strong><span class="brainrot-bank">$${Math.floor(brainrot.storedCash).toLocaleString()} stored</span><span class="collect-label">COLLECT</span></button><div class="brainrot-actions"><button data-sell="${brainrot.id}" title="Sell brainrot">Sell $${brainrot.sale}</button></div>`;
+    const image = document.createElement("img");
+    image.src = brainrot.image;
+    image.alt = brainrot.name;
+
+    const details = document.createElement("div");
+    details.className = "brainrot-details";
+    const rarity = document.createElement("strong");
+    rarity.className = "brainrot-rarity";
+    rarity.textContent = brainrot.rarity;
+    const name = document.createElement("input");
+    name.className = "brainrot-name";
+    name.type = "text";
+    name.value = brainrot.name;
+    name.maxLength = 40;
+    name.dataset.name = brainrot.id;
+    name.setAttribute("aria-label", `Name for ${brainrot.rarity} brainrot`);
+    const bank = document.createElement("span");
+    bank.className = "brainrot-bank";
+    bank.dataset.bank = brainrot.id;
+    bank.textContent = `$${Math.floor(brainrot.storedCash).toLocaleString()} stored`;
+    details.append(rarity, name, bank);
+
+    const actions = document.createElement("div");
+    actions.className = "brainrot-actions";
+    const imagePicker = document.createElement("label");
+    imagePicker.className = "brainrot-image-picker";
+    imagePicker.append(document.createTextNode("SET IMAGE"));
+    const imageInput = document.createElement("input");
+    imageInput.type = "file";
+    imageInput.accept = "image/*";
+    imageInput.dataset.image = brainrot.id;
+    imageInput.setAttribute("aria-label", `Choose an image for ${brainrot.name}`);
+    imagePicker.append(imageInput);
+
+    const collect = document.createElement("button");
+    collect.dataset.claim = brainrot.id;
+    collect.setAttribute("aria-label", `Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.name}`);
+    collect.textContent = "COLLECT";
+    const sell = document.createElement("button");
+    sell.dataset.sell = brainrot.id;
+    sell.title = "Sell brainrot";
+    sell.textContent = `Sell $${brainrot.sale * SELL_VALUE_MULTIPLIER}`;
+    actions.append(imagePicker, collect, sell);
+    card.append(image, details, actions);
     grid.append(card);
   }
   renderShop();
@@ -511,6 +638,36 @@ function endGame(reason) {
   gameOverReason = reason;
 }
 
+function showTitleScreen() {
+  viewMode = "title";
+  document.getElementById("shop-backdrop").hidden = true;
+  renderMenu();
+}
+
+function showSettings() {
+  viewMode = "settings";
+  document.getElementById("shop-backdrop").hidden = true;
+  renderMenu();
+}
+
+function beginGame() {
+  gameStarted = true;
+  viewMode = "game";
+  renderMenu();
+}
+
+function renderMenu() {
+  const overlay = document.getElementById("title-screen");
+  if (!overlay) return;
+  overlay.hidden = viewMode === "game";
+  document.getElementById("title-menu").hidden = viewMode !== "title";
+  document.getElementById("settings-menu").hidden = viewMode !== "settings";
+  document.getElementById("start-game").textContent = gameStarted ? "RESUME GAME" : "START GAME";
+  document.getElementById("title-menu-toggle").hidden = !gameStarted;
+  document.getElementById("particle-toggle").checked = particleEffectsEnabled;
+  document.getElementById("game-speed").value = String(gameSpeed);
+}
+
 
 // ------------------------------------------------------------
 // THE GAME LOOP
@@ -523,10 +680,14 @@ let leftover = 0;
 
 function frame(now) {
   const elapsed = Math.min(now - lastTime, 250);
-  leftover += elapsed * (keys[" "] ? 4 : 1);
+  if (viewMode === "game") {
+    leftover += elapsed * gameSpeed * (keys[" "] ? 4 : 1);
+  } else {
+    leftover = 0;
+  }
   lastTime = now;
 
-  while (leftover >= STEP) {
+  while (viewMode === "game" && leftover >= STEP) {
     update();
     leftover = leftover - STEP;
   }
@@ -536,15 +697,11 @@ function frame(now) {
 }
 
 function start() {
-  try {
-    customBrainrotImage = localStorage.getItem("brickscape-brainrot-image") || "";
-  } catch {
-    customBrainrotImage = "";
-  }
   resetBalls();
   spawnFallingPiece();
   renderShop();
   renderFactory();
+  renderMenu();
   lastTime = performance.now();
   requestAnimationFrame(frame);
 }

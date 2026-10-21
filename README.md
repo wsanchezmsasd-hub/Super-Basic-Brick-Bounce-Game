@@ -1,13 +1,58 @@
-# BRICKROT FACTORY
+# ⚡💥 BRICKROT FACTORY 💥⚡
 
-An overstimulating brick-breaker factory sim. Smash descending blocks, collect brainrots, and build a wildly overpowered production line.
+> **BREAK THE STACK. CATCH THE ROT. BUILD THE EMPIRE.**
+>
+> Welcome to the neon-soaked, bass-face, brainrot-powered brick pit. The bricks are falling. The factory is hungry. Your paddle is the only thing between you and a totally avoidable corporate catastrophe.
 
-## Play
+```text
+██████╗ ██████╗ ██╗ ██████╗██╗  ██╗██████╗  ██████╗ ████████╗
+██╔══██╗██╔══██╗██║██╔════╝██║ ██╔╝██╔══██╗██╔═══██╗╚══██╔══╝
+██████╔╝██████╔╝██║██║     █████╔╝ ██████╔╝██║   ██║   ██║
+██╔══██╗██╔══██╗██║██║     ██╔═██╗ ██╔══██╗██║   ██║   ██║
+██████╔╝██║  ██║██║╚██████╗██║  ██╗██║  ██║╚██████╔╝   ██║
+╚═════╝ ╚═╝  ╚═╝╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝    ╚═╝
+```
 
-- Aim with the pointer, steer with the arrow keys or A/D, and launch with Space, Enter, or a click. Hold Space to speed up the game.
-- Bricks drop brainrots into your Factory. Each brainrot generates cash over time; click **Collect** to claim its stored money or **Sell** to cash out the brainrot.
-- Buy upgrades whenever you like with the **Upgrades** button or U. Factory floors increase capacity and production; other upgrades improve income, drops, paddle size, and balls.
-- Upload an image in the Factory to use it for all brainrots. The image is saved in this browser.
-- Every brick that reaches the bottom steals 25% of your brainrots. Keep the stack moving.
+## 🚨 THE MISSION: MAKE THE NUMBERS GO UP 🚨
 
-Rarity odds are Common 1/2, Uncommon 1/4, Rare 1/10, Legendary 1/32, Mythical 1/64, and Brainrot God 1/256. Higher rarities earn and sell for more.
+Smash descending blocks. Catch falling brainrots. Feed the Factory. Sell your tiny weirdos for **7× their listed base value**. Repeat until the stack reaches the top or your factory becomes an interdimensional cash machine.
+
+## 🎮 CONTROLS // NO BRAKES
+
+| ACTION | INPUT |
+|:--|:--|
+| 🏎️ Move | `←` `→` or `A` / `D` |
+| 🎯 Aim | Pointer |
+| 💣 Launch | `SPACE` / `ENTER` / click |
+| ⚡ Boost | Hold `SPACE` |
+| 🛠️ Upgrades | **UPGRADES** button or `U` |
+| 🧲 Catch drops | Steer the paddle into the falling brainrot |
+| 🏁 Pause / menu | **MENU** button or `ESC` |
+
+## 🔊 PHONK PIT // QUICK START
+
+1. Hit **START GAME**. The opening screen is loud-looking; the game itself makes no sound.
+2. Aim, launch, and smash the stack. Neon particle bursts celebrate hits and catches.
+3. A rarity-marked brick can drop its matching brainrot when broken. Drops are half a brick wide—**catch them with the paddle** before they fall away.
+4. Brainrots in your Factory generate cash. Click **COLLECT** for the banked money, or **SELL** for **7× the displayed base sale value**, plus any banked cash.
+5. Use **MENU** whenever you need a breather. **RESUME GAME** returns to the same board, brainrots, upgrades, and wallet—progress is not reset.
+6. Open **SETTINGS** for particle effects and game speed: Standard, Turbo, or Phonk.
+
+## 🧠 RARITY RAVE // DROP ODDS
+
+| RARITY | CHANCE | DEFAULT BRAINROT |
+|:--|--:|:--|
+| ⚪ Common | 1/2 | Tung Tung Tung sahur |
+| 🟢 Uncommon | 1/4 | lirili larila |
+| 🔵 Rare | 1/10 | ballerina cappuccina |
+| 🟡 Legendary | 1/32 | bombodido crocodilo |
+| 🟠 Mythical | 1/64 | tralalelo tralala |
+| 💖 Brainrot God | 1/256 | la vaca saturno saturnita |
+
+Each rarity has its own PNG. Edit a brainrot's name and choose a custom image right on its Factory card. Higher rarities generate and sell for more; the label on a marked brick tells you what it drops.
+
+## 🏭 FACTORY // UPGRADE // REPEAT
+
+Factory floors and vaults add capacity. Turbo Belts boost income. The Brainrot Magnet improves drop odds. Wide Catcher widens the paddle, and Extra Launch adds a ball. A brick reaching the bottom steals 25% of your brainrots, so keep that stack moving.
+
+> **WARNING:** Side effects may include neon blindness, an unhealthy attachment to tiny collectible weirdos, and saying “one more volley” until sunrise. ⚠️

@@ -84,14 +84,19 @@ function bounceOffBricks(ball) {
       }
     }
 
+    spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#fff45c", 5);
     brick.hitsRemaining -= 1;
     if (brick.hitsRemaining <= 0) {
-      if (Math.random() < Math.min(0.98, GAME_CONFIG.brainrots.dropChance * brainrotDropMultiplier)) createBrainrot();
+      spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#ff4cae", 22);
       if (brick.effect === "ROW") {
-        const rowBrickCount = bricks.filter((candidate) => candidate.y === brick.y).length;
-        GameState.Score += rowBrickCount * 10;
+        const rowBricks = bricks.filter((candidate) => candidate.y === brick.y);
+        for (const rowBrick of rowBricks) {
+          if (rowBrick.brainrotRarity) spawnBrainrotDrop(rowBrick.brainrotRarity, rowBrick);
+        }
+        GameState.Score += rowBricks.length * 10;
         bricks = bricks.filter((candidate) => candidate.y !== brick.y);
       } else {
+        if (brick.brainrotRarity) spawnBrainrotDrop(brick.brainrotRarity, brick);
         GameState.Score += 10;
         bricks.splice(index, 1);
       }

@@ -11,20 +11,21 @@
     <header class="topbar">
       <div class="brand"><span class="brand-mark">B!</span><div><p class="eyebrow">TOTALLY NORMAL BUSINESS</p><h1>BRICKROT <em>FACTORY</em></h1></div></div>
       <div class="cash-display"><span>AVAILABLE CASH</span><strong id="cash-balance">$0</strong></div>
+      <button id="title-menu-toggle" class="menu-toggle" hidden>MENU</button>
       <button id="shop-toggle" class="shop-toggle"><span aria-hidden="true">⬆</span> UPGRADES <kbd>U</kbd></button>
     </header>
     <section class="game-layout">
       <div class="arcade-column">
         <div class="arcade-label"><span>LIVE FEED // BRICK PIT</span><span class="live-dot">● LIVE</span></div>
         <canvas id="game" width="900" height="1200" aria-label="Brickrot Factory falling-block brick breaker"></canvas>
-        <div class="controls-strip"><span>MOVE: <b>← → / A D</b></span><span>AIM: <b>POINTER</b></span><span>LAUNCH: <b>SPACE / CLICK</b></span><span>BOOST: <b>HOLD SPACE</b></span></div>
+        <div class="controls-strip"><span>MOVE: <b>← → / A D</b></span><span>AIM: <b>POINTER</b></span><span>LAUNCH: <b>SPACE / CLICK</b></span><span>BOOST: <b>HOLD SPACE</b></span><span>GRAB DROPS: <b>CATCH WITH PADDLE</b></span></div>
       </div>
       <section class="factory-panel" aria-labelledby="factory-title">
         <div class="panel-heading"><div><p class="eyebrow">PRODUCTION LINE 01</p><h2 id="factory-title">THE FACTORY</h2></div><span id="factory-floors" class="floor-tag">1 FLOOR</span></div>
         <div class="factory-metrics"><strong id="factory-count">0/8</strong><span>CAPACITY</span><strong id="factory-multiplier">1.00x FACTORY</strong></div>
-        <div class="factory-actions"><button id="sell-all" class="sell-all" disabled>SELL ALL BRAINROTS</button><label class="image-picker">SET CUSTOM IMAGE<input id="brainrot-image" type="file" accept="image/*"></label></div>
+        <div class="factory-actions"><button id="sell-all" class="sell-all" disabled>SELL ALL BRAINROTS</button></div>
         <div id="factory-grid" class="factory-grid" aria-live="polite"></div>
-        <p class="empty-factory">NO BRAINROTS IN THE BUILDING.<br>BREAK BRICKS. FEED THE FACTORY.</p>
+        <p class="empty-factory">NO BRAINROTS IN THE BUILDING.<br>BREAK BRICKS, CATCH THEIR DROPS, THEN EDIT EACH NAME AND IMAGE.</p>
         <div class="rarity-key"><span>COMMON</span><span>UNCOMMON</span><span>RARE</span><span>LEGENDARY</span><span>MYTHICAL</span><span>BRAINROT GOD</span></div>
       </section>
     </section>
@@ -36,6 +37,33 @@
       <div class="shop-wallet">WALLET <strong id="shop-cash">$0</strong></div>
       <div id="upgrade-list" class="upgrade-list"></div>
     </aside>
+  </div>
+
+  <div id="title-screen" class="title-screen">
+    <div class="title-scanlines" aria-hidden="true"></div>
+    <section id="title-menu" class="title-card" aria-labelledby="title-heading">
+      <p class="title-eyebrow">⚡ BRICK PIT // SOUND SYSTEM: PHONK ⚡</p>
+      <h2 id="title-heading" class="phonk-title"><span>BRICKROT</span><em>FACTORY</em></h2>
+      <p class="title-tagline">BREAK THE STACK. CATCH THE ROT. BUILD THE EMPIRE.</p>
+      <div class="title-stats"><span>NEON CHAOS</span><span>● BASS ENERGY</span><span>NO BRAKES</span></div>
+      <div class="title-actions">
+        <button id="start-game" class="start-button">START GAME</button>
+        <button id="open-settings" class="settings-button">⚙ SETTINGS</button>
+      </div>
+      <p class="title-hint">MOVE ← → / A D <b>◆</b> AIM WITH POINTER <b>◆</b> LAUNCH SPACE</p>
+    </section>
+    <section id="settings-menu" class="title-card settings-card" aria-labelledby="settings-heading" hidden>
+      <p class="title-eyebrow">⚙ TUNE YOUR CHAOS ⚙</p>
+      <h2 id="settings-heading" class="phonk-title settings-title"><span>GAME</span><em>SETTINGS</em></h2>
+      <label class="setting-row"><span><strong>PARTICLE FX</strong><small>Neon bursts on hits and catches</small></span><input id="particle-toggle" type="checkbox" checked></label>
+      <label class="setting-row"><span><strong>GAME SPEED</strong><small>Set the simulation speed</small></span>
+        <select id="game-speed"><option value="1">1× STANDARD</option><option value="2">2× TURBO</option><option value="4">4× PHONK</option></select>
+      </label>
+      <button id="settings-back" class="settings-button">← BACK TO TITLE</button>
+    </section>
+    <span class="title-orb orb-one" aria-hidden="true"></span>
+    <span class="title-orb orb-two" aria-hidden="true"></span>
+    <span class="title-orb orb-three" aria-hidden="true"></span>
   </div>
 
   <!-- Config.js must load first so gameplay settings are available to the game. -->

@@ -11,11 +11,18 @@ document.addEventListener("keydown", function (event) {
   const key = event.key.toLowerCase();
   keys[key] = true;
   if (!event.repeat && key === "u") {
-    setShopOpen(true);
+    if (viewMode === "game") setShopOpen(true);
   } else if (!event.repeat && key === "escape") {
-    setShopOpen(false);
+    if (!document.getElementById("shop-backdrop").hidden) {
+      setShopOpen(false);
+    } else if (viewMode === "game") {
+      showTitleScreen();
+    } else if (viewMode === "settings") {
+      viewMode = "title";
+      renderMenu();
+    }
   }
-  if (!event.repeat && gameMode === "playing" && (key === " " || key === "enter")) {
+  if (!event.repeat && viewMode === "game" && gameMode === "playing" && (key === " " || key === "enter")) {
     launchBalls();
   }
   if (event.key.startsWith("Arrow") || key === " ") {
@@ -29,6 +36,20 @@ function setShopOpen(open) {
 }
 
 document.getElementById("shop-toggle").addEventListener("click", () => setShopOpen(true));
+document.getElementById("title-menu-toggle").addEventListener("click", showTitleScreen);
+document.getElementById("start-game").addEventListener("click", beginGame);
+document.getElementById("open-settings").addEventListener("click", showSettings);
+document.getElementById("settings-back").addEventListener("click", () => {
+  viewMode = "title";
+  renderMenu();
+});
+document.getElementById("particle-toggle").addEventListener("change", (event) => {
+  particleEffectsEnabled = event.target.checked;
+  if (!particleEffectsEnabled) particles.length = 0;
+});
+document.getElementById("game-speed").addEventListener("change", (event) => {
+  gameSpeed = Number(event.target.value);
+});
 document.getElementById("shop-close").addEventListener("click", () => setShopOpen(false));
 document.getElementById("shop-backdrop").addEventListener("click", (event) => {
   if (event.target.id === "shop-backdrop") setShopOpen(false);
@@ -40,27 +61,47 @@ document.getElementById("factory-grid").addEventListener("click", (event) => {
   if (claimButton) claimBrainrot(claimButton.dataset.claim);
   if (sellButton) sellBrainrot(sellButton.dataset.sell);
 });
+document.getElementById("factory-grid").addEventListener("input", (event) => {
+  const nameInput = event.target.closest("[data-name]");
+  if (!nameInput) return;
+  const brainrot = brainrots.find((item) => item.id === nameInput.dataset.name);
+  if (brainrot) {
+    brainrot.name = nameInput.value;
+    nameInput.closest(".brainrot").querySelector("img").alt = brainrot.name;
+  }
+});
+document.getElementById("factory-grid").addEventListener("change", (event) => {
+  const nameInput = event.target.closest("[data-name]");
+  if (nameInput) {
+    const brainrot = brainrots.find((item) => item.id === nameInput.dataset.name);
+    if (brainrot) {
+      brainrot.name = nameInput.value.trim() || brainrot.defaultName;
+      nameInput.value = brainrot.name;
+      nameInput.closest(".brainrot").querySelector("img").alt = brainrot.name;
+    }
+    return;
+  }
+  const input = event.target.closest("[data-image]");
+  const file = input?.files[0];
+  if (!input || !file) return;
+  const brainrot = brainrots.find((item) => item.id === input.dataset.image);
+  if (!brainrot) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    if (typeof reader.result !== "string") {
+      window.alert("The selected image could not be loaded.");
+      return;
+    }
+    brainrot.image = reader.result;
+    renderFactory();
+  });
+  reader.addEventListener("error", () => window.alert("The selected image could not be loaded."));
+  reader.readAsDataURL(file);
+});
 document.getElementById("upgrade-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-upgrade]");
   if (button) buyUpgrade(button.dataset.upgrade);
 });
-document.getElementById("brainrot-image").addEventListener("change", (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    customBrainrotImage = reader.result;
-    try {
-      localStorage.setItem("brickscape-brainrot-image", customBrainrotImage);
-    } catch {
-      // Keep the selected image active even when browser storage is full.
-    }
-    for (const brainrot of brainrots) brainrot.image = customBrainrotImage;
-    renderFactory();
-  });
-  reader.readAsDataURL(file);
-});
-
 document.addEventListener("keyup", function (event) {
   keys[event.key.toLowerCase()] = false;
 });
