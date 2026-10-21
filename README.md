@@ -1,33 +1,13 @@
-# 🎮 BRICKSCAPE: The Amazing Digital Circus
+# BRICKROT FACTORY
 
-> **Welcome to Your ~~Eternal Prison~~ world of Fun!** *(A Tetris-Inspired Brick Breaker Adventure)*
+An overstimulating brick-breaker factory sim. Smash descending blocks, collect brainrots, and build a wildly overpowered production line.
 
----
+## Play
 
-## 🎪 The Story
+- Aim with the pointer, steer with the arrow keys or A/D, and launch with Space, Enter, or a click. Hold Space to speed up the game.
+- Bricks drop brainrots into your Factory. Each brainrot generates cash over time; click **Collect** to claim its stored money or **Sell** to cash out the brainrot.
+- Buy upgrades whenever you like with the **Upgrades** button or U. Factory floors increase capacity and production; other upgrades improve income, drops, paddle size, and balls.
+- Upload an image in the Factory to use it for all brainrots. The image is saved in this browser.
+- Every brick that reaches the bottom steals 25% of your brainrots. Keep the stack moving.
 
-As a reward for being an amazing citizen and destroying the evil brick walls, you've been sent to an eternal ~~prison~~ fun Tetris world! But beware—this digital circus is more dangerous than it seems...
-
-## 🕹️ How to Survive
-
-### The Challenge
-Your mission is simple: **launch volleys of balls into Tetris blocks**. Catch the returning balls, then face the next drop as the stack advances.
-
-### The Rules
-- **Aim and launch** — Move the paddle with the arrow keys or A/D. Aim with the pointer and launch with Space, Enter, or a click. Hold Space to speed up play.
-- **Catch your balls** — Balls that return to the paddle wait there until the next volley. After each volley, the stack drops one or two rows.
-- **Use block effects** — Special blocks are labeled `ROW` or `BALL`. Breaking one clears its row or adds a temporary ball for the current wave.
-- **Keep the bottom clear** 💥 — If the stack reaches the bottom, you'll be ~~erased from all multiverses~~ defeated!
-- **Clear horizontal rows** 🧹 — Complete rows disappear; collect brick chunks dropped by broken blocks.
-- **Buy permanent upgrades** 🛍 — Spend chunks between waves. Each upgrade can only be bought once, while distinct bonuses can stack.
-
-## ⚙️ Features
-- A taller playing field filled with descending Tetris pieces
-- Tougher and more numerous pieces on later waves
-- Distinct permanent upgrades and temporary ball effects
-- Strategic aiming and paddle control
-- Progressive difficulty
-
----
-
-**Ready to escape the circus? Start playing now! 🚀**
+Rarity odds are Common 1/2, Uncommon 1/4, Rare 1/10, Legendary 1/32, Mythical 1/64, and Brainrot God 1/256. Higher rarities earn and sell for more.

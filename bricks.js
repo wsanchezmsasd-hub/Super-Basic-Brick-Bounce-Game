@@ -33,13 +33,22 @@ function createBrick(x, y, hitsRequired = 1, effect = null) {
 
 function drawBricks() {
   for (const brick of bricks) {
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(brick.x + 1, brick.y + 1, brick.width - 2, brick.height - 2);
-    ctx.fillStyle = "white";
+    const hue = (brick.x * 0.34 + brick.y * 0.18 + performance.now() / 32) % 360;
+    const gradient = ctx.createLinearGradient(brick.x, brick.y, brick.x + brick.width, brick.y + brick.height);
+    gradient.addColorStop(0, `hsl(${hue}, 100%, 62%)`);
+    gradient.addColorStop(1, `hsl(${(hue + 62) % 360}, 100%, 48%)`);
+    ctx.shadowColor = `hsl(${hue}, 100%, 58%)`;
+    ctx.shadowBlur = 13;
+    ctx.fillStyle = gradient;
+    ctx.fillRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(255,255,255,.8)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
+    ctx.fillStyle = "#10121a";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "bold 10px Courier New";
+    ctx.font = "900 12px Impact, sans-serif";
     const label = brick.effect || (brick.hitsRequired > 1 ? `x${brick.hitsRemaining}` : "BLOCK");
     ctx.fillText(label, brick.x + brick.width / 2, brick.y + brick.height / 2, brick.width - 4);
   }

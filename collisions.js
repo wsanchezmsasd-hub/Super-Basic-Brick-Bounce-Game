@@ -86,10 +86,7 @@ function bounceOffBricks(ball) {
 
     brick.hitsRemaining -= 1;
     if (brick.hitsRemaining <= 0) {
-      if (Math.random() < chunkDropChance) {
-        const chunkSize = GAME_CONFIG.brickChunks.size;
-        createBrickChunk(brick.x + brick.width / 2 - chunkSize / 2, brick.y + brick.height / 2 - chunkSize / 2);
-      }
+      if (Math.random() < Math.min(0.98, GAME_CONFIG.brainrots.dropChance * brainrotDropMultiplier)) createBrainrot();
       if (brick.effect === "ROW") {
         const rowBrickCount = bricks.filter((candidate) => candidate.y === brick.y).length;
         GameState.Score += rowBrickCount * 10;

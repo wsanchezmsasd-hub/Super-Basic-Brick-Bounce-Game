@@ -3,14 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Brickscape</title>
+  <title>BRICKROT FACTORY // Brickscape</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main>
-    <canvas id="game" width="600" height="800" aria-label="Brickscape falling-block game"></canvas>
-    <p>Aim with the pointer, move with the arrow keys or A and D, then launch with Space, Enter, or a click. Hold Space to speed up play. Balls return when they reach the bottom; blocks drop after each volley. Use 1 or 2 to buy a permanent upgrade between waves.</p>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">B!</span><div><p class="eyebrow">TOTALLY NORMAL BUSINESS</p><h1>BRICKROT <em>FACTORY</em></h1></div></div>
+      <div class="cash-display"><span>AVAILABLE CASH</span><strong id="cash-balance">$0</strong></div>
+      <button id="shop-toggle" class="shop-toggle"><span aria-hidden="true">⬆</span> UPGRADES <kbd>U</kbd></button>
+    </header>
+    <section class="game-layout">
+      <div class="arcade-column">
+        <div class="arcade-label"><span>LIVE FEED // BRICK PIT</span><span class="live-dot">● LIVE</span></div>
+        <canvas id="game" width="900" height="1200" aria-label="Brickrot Factory falling-block brick breaker"></canvas>
+        <div class="controls-strip"><span>MOVE: <b>← → / A D</b></span><span>AIM: <b>POINTER</b></span><span>LAUNCH: <b>SPACE / CLICK</b></span><span>BOOST: <b>HOLD SPACE</b></span></div>
+      </div>
+      <section class="factory-panel" aria-labelledby="factory-title">
+        <div class="panel-heading"><div><p class="eyebrow">PRODUCTION LINE 01</p><h2 id="factory-title">THE FACTORY</h2></div><span id="factory-floors" class="floor-tag">1 FLOOR</span></div>
+        <div class="factory-metrics"><strong id="factory-count">0/8</strong><span>CAPACITY</span><strong id="factory-multiplier">1.00x FACTORY</strong></div>
+        <div class="factory-actions"><button id="sell-all" class="sell-all" disabled>SELL ALL BRAINROTS</button><label class="image-picker">SET CUSTOM IMAGE<input id="brainrot-image" type="file" accept="image/*"></label></div>
+        <div id="factory-grid" class="factory-grid" aria-live="polite"></div>
+        <p class="empty-factory">NO BRAINROTS IN THE BUILDING.<br>BREAK BRICKS. FEED THE FACTORY.</p>
+        <div class="rarity-key"><span>COMMON</span><span>UNCOMMON</span><span>RARE</span><span>LEGENDARY</span><span>MYTHICAL</span><span>BRAINROT GOD</span></div>
+      </section>
+    </section>
   </main>
+
+  <div id="shop-backdrop" class="shop-backdrop" hidden>
+    <aside class="shop-panel" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+      <header class="shop-header"><div><p class="eyebrow">MAKE THE NUMBERS GO UP</p><h2 id="shop-title">UPGRADE LAB</h2></div><button id="shop-close" class="icon-button" aria-label="Close upgrades">×</button></header>
+      <div class="shop-wallet">WALLET <strong id="shop-cash">$0</strong></div>
+      <div id="upgrade-list" class="upgrade-list"></div>
+    </aside>
+  </div>
 
   <!-- Config.js must load first so gameplay settings are available to the game. -->
   <script src="Config.js"></script>

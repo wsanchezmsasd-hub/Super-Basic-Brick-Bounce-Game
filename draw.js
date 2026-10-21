@@ -1,36 +1,56 @@
-function draw() {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  ctx.fillStyle = "white";
+function drawPaddle() {
+  const gradient = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x + paddle.width, paddle.y);
+  gradient.addColorStop(0, "#ff37a6");
+  gradient.addColorStop(0.5, "#ffe64a");
+  gradient.addColorStop(1, "#36f4e0");
+  ctx.shadowColor = "#ff38b9";
+  ctx.shadowBlur = 24;
+  ctx.fillStyle = gradient;
   ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+  ctx.shadowBlur = 0;
+}
+
+function draw() {
+  const background = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+  background.addColorStop(0, "#170624");
+  background.addColorStop(0.5, "#071d2c");
+  background.addColorStop(1, "#271007");
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillStyle = "rgba(255,255,255,.045)";
+  for (let line = 0; line < HEIGHT; line += 8) ctx.fillRect(0, line, WIDTH, 1);
+
+  drawPaddle();
   for (const ball of balls) {
-    ctx.fillRect(ball.x, ball.y, ball.width, ball.height);
+    ctx.beginPath();
+    ctx.arc(ball.x + ball.width / 2, ball.y + ball.height / 2, ball.width / 2, 0, Math.PI * 2);
+    ctx.shadowColor = "#fbff43";
+    ctx.shadowBlur = 25;
+    ctx.fillStyle = "#fbff43";
+    ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
   if (!volleyActive && gameMode === "playing") {
     const aimX = paddle.x + paddle.width / 2 + Math.sin(aimAngle) * 80;
     const aimY = paddle.y + paddle.height / 2 - Math.cos(aimAngle) * 80;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+    ctx.strokeStyle = "rgba(255, 230, 74, 0.7)";
+    ctx.setLineDash([7, 8]);
     ctx.beginPath();
     ctx.moveTo(paddle.x + paddle.width / 2, paddle.y);
     ctx.lineTo(aimX, aimY);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   drawBricks();
   drawBoardGuides();
-  drawBrickChunks();
   drawHud();
-  if (gameMode === "intermission") {
-    drawIntermission();
-  } else if (gameMode === "gameover") {
-    drawGameOver();
-  }
+  if (gameMode === "gameover") drawGameOver();
 }
 
 function drawBoardGuides() {
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.strokeStyle = "rgba(111, 240, 255, 0.15)";
   ctx.lineWidth = 1;
   for (let col = 0; col <= BRICK_COLUMNS; col++) {
     const x = col * BRICK_WIDTH;
@@ -46,83 +66,41 @@ function drawBoardGuides() {
     ctx.lineTo(WIDTH, y);
     ctx.stroke();
   }
-  ctx.strokeStyle = "#f5c542";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ff3c9e";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 7]);
   ctx.beginPath();
   ctx.moveTo(0, BOARD_BOTTOM - BRICK_HEIGHT);
   ctx.lineTo(WIDTH, BOARD_BOTTOM - BRICK_HEIGHT);
   ctx.stroke();
-}
-
-function drawBrickChunks() {
-  ctx.fillStyle = "#f5c542";
-  for (const chunk of brickChunks) {
-    ctx.save();
-    ctx.translate(chunk.x + chunk.width / 2, chunk.y + chunk.height / 2);
-    ctx.rotate(chunk.angle);
-    ctx.fillRect(-chunk.width / 2, -chunk.height / 2, chunk.width, chunk.height);
-    ctx.restore();
-  }
+  ctx.setLineDash([]);
 }
 
 function drawHud() {
-  ctx.fillStyle = "#f5c542";
-  ctx.font = "14px Courier New";
+  ctx.fillStyle = "#ffe64a";
+  ctx.font = "bold 20px Impact, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(`CHUNKS: ${chunkBalance}`, 12, 22);
-  ctx.fillText(`BALLS: ${balls.length}`, 140, 22);
+  ctx.fillText(`BRAINROTS ${brainrots.length}/${factoryCapacity}`, 12, 24);
+  ctx.fillStyle = "#42f2df";
+  ctx.fillText(`BALLS ${balls.length}`, 12, 47);
   ctx.textAlign = "right";
-  ctx.fillStyle = "white";
-  ctx.fillText(`WAVE ${wave}  PIECES ${spawnedPieces}/${piecesThisWave}`, WIDTH - 12, 22);
+  ctx.fillStyle = "#ff64bb";
+  ctx.fillText(`SCORE ${GameState.Score}`, WIDTH - 12, 24);
   ctx.textAlign = "left";
-  ctx.fillText(`SCORE: ${GameState.Score}`, 12, 42);
-  ctx.fillText(`LIVES: ${GameState.Lives}/${GameState.MaxLives}`, 180, 42);
-}
-
-function drawIntermission() {
-  ctx.fillStyle = "rgba(0, 0, 0, 0.86)";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#f5c542";
-  ctx.font = "bold 26px Courier New";
-  ctx.fillText("WAVE CLEAR", WIDTH / 2, 350);
-  ctx.fillStyle = "white";
-  ctx.font = "15px Courier New";
-  ctx.fillText(`BRICK CHUNKS: ${chunkBalance}`, WIDTH / 2, 385);
-
-  for (let index = 0; index < 2; index++) {
-    const x = 126 + index * 242;
-    const upgrade = upgradeOffers[index];
-    ctx.strokeStyle = upgrade ? "#f5c542" : "#555";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, 430, 222, 138);
-    ctx.fillStyle = upgrade ? "white" : "#888";
-    ctx.font = "bold 17px Courier New";
-    ctx.fillText(`${index + 1}: ${upgrade ? upgrade.name : "No upgrade"}`, x + 111, 470);
-    if (upgrade) {
-      ctx.font = "13px Courier New";
-      ctx.fillText(upgrade.description, x + 111, 502);
-      ctx.fillStyle = chunkBalance >= upgrade.cost ? "#f5c542" : "#ff7777";
-      ctx.fillText(`COST: ${upgrade.cost} CHUNKS`, x + 111, 536);
-    }
-  }
-
-  ctx.fillStyle = "white";
-  ctx.font = "14px Courier New";
-  ctx.fillText("BUY WITH 1 OR 2  |  ENTER TO CONTINUE", WIDTH / 2, 610);
   ctx.textAlign = "left";
 }
 
 function drawGameOver() {
-  ctx.fillStyle = "rgba(0, 0, 0, 0.86)";
+  ctx.fillStyle = "rgba(8, 3, 18, 0.88)";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  drawPaddle();
   ctx.textAlign = "center";
-  ctx.fillStyle = "#f5c542";
-  ctx.font = "bold 30px Courier New";
-  ctx.fillText("YOU HAVE BEEN DELETED", WIDTH / 2, HEIGHT / 2 - 30);
-  ctx.fillStyle = "white";
-  ctx.font = "16px Courier New";
+  ctx.fillStyle = "#ff4cae";
+  ctx.font = "bold 44px Impact, sans-serif";
+  ctx.fillText("FACTORY JAMMED", WIDTH / 2, HEIGHT / 2 - 30);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 24px Impact, sans-serif";
   ctx.fillText(gameOverReason, WIDTH / 2, HEIGHT / 2 + 5);
-  ctx.fillText("REFRESH TO PLAY AGAIN", WIDTH / 2, HEIGHT / 2 + 40);
+  ctx.fillText("REFRESH TO RESTART", WIDTH / 2, HEIGHT / 2 + 48);
   ctx.textAlign = "left";
 }

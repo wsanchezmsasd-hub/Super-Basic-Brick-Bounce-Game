@@ -1,0 +1,24 @@
+{
+  "name": "brickscape",
+  "version": "1.0.0",
+  "description": "> **Welcome to Your ~~Eternal Prison~~ world of Fun!** *(A Tetris-Inspired Brick Breaker Adventure)*",
+  "main": "Config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wsanchezmsasd-hub/BRICKSCAPE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/wsanchezmsasd-hub/BRICKSCAPE/issues"
+  },
+  "homepage": "https://github.com/wsanchezmsasd-hub/BRICKSCAPE#readme",
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}

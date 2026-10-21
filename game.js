@@ -12,11 +12,7 @@ const ctx = canvas.getContext("2d");
 const WIDTH = canvas.width;   // 600
 const HEIGHT = canvas.height; // 800
 
-const GameState = {
-  Lives: 5,
-  MaxLives: 5,
-  Score: 0
-};
+const GameState = { Score: 0 };
 
 
 // ------------------------------------------------------------
@@ -44,12 +40,11 @@ function resetBalls() {
 }
 
 function positionHeldBalls() {
-  const heldBalls = balls.filter((ball) => ball.state === "held");
-  heldBalls.forEach((ball, index) => {
-    const spacing = Math.min(ball.width + 5, paddle.width / heldBalls.length);
-    ball.x = paddle.x + paddle.width / 2 - ball.width / 2 + (index - (heldBalls.length - 1) / 2) * spacing;
+  for (const ball of balls) {
+    if (ball.state !== "held") continue;
+    ball.x = paddle.x + paddle.width / 2 - ball.width / 2;
     ball.y = paddle.y - ball.height;
-  });
+  }
 }
 
 
@@ -57,11 +52,14 @@ function positionHeldBalls() {
 // THE PADDLE
 // ------------------------------------------------------------
 const paddle = {
-  x: WIDTH / 2 - 60,
-  y: HEIGHT - 30,
-  width: 120,
+  x: WIDTH / 2 - 45,
+  y: HEIGHT - 45,
+  width: 90,
   height: 12,
-  speed: 10
+  speed: 7,
+  velocity: 0,
+  targetX: null,
+  wallDirection: 0
 };
 
 
@@ -70,76 +68,103 @@ const paddle = {
 // ------------------------------------------------------------
 let bricks = [];
 let enemyEntities = [];
-let spawnedPieces = 0;
-let piecesThisWave = 0;
-let brickChunks = [];
-let chunkBalance = 0;
-let chunkValue = GAME_CONFIG.brickChunks.value;
-let chunkDropChance = GAME_CONFIG.brickChunks.dropChance;
+let brainrots = [];
+let cashBalance = 0;
+let factoryCapacity = 8;
+let factoryFloors = 1;
+let factoryMultiplier = 1;
+let brainrotIncomeMultiplier = 1;
+let brainrotDropMultiplier = 1;
+let customBrainrotImage = "";
 let gameMode = "playing";
-let wave = 1;
 let gameOverReason = "";
-let upgradeOffers = [];
-const purchasedUpgrades = new Set();
 
 const upgrades = [
   {
-    id: "paddle5",
-    name: "+5% Paddle",
-    description: "Paddle width +5%",
-    cost: 4,
+    id: "floor2",
+    name: "Factory: Floor 2",
+    description: "+8 slots and a permanent 1.1x factory multiplier",
+    cost: 120,
+    maxPurchases: 1,
     apply() {
-      paddle.width = Math.min(WIDTH * 0.4, paddle.width * 1.05);
+      factoryFloors += 1;
+      factoryCapacity += 8;
+      factoryMultiplier *= 1.1;
     }
   },
   {
-    id: "paddle10",
-    name: "+10% Paddle",
-    description: "Paddle width +10%",
-    cost: 6,
+    id: "floor3",
+    name: "Factory: Floor 3",
+    description: "+12 slots and a permanent 1.25x factory multiplier",
+    cost: 640,
+    maxPurchases: 1,
     apply() {
-      paddle.width = Math.min(WIDTH * 0.4, paddle.width * 1.1);
+      factoryFloors += 1;
+      factoryCapacity += 12;
+      factoryMultiplier *= 1.25;
     }
   },
   {
-    id: "chunkChance",
-    name: "+15% Chunk Chance",
-    description: "Higher chunk drop chance",
-    cost: 5,
+    id: "automation",
+    name: "Turbo Belts",
+    description: "Brainrot income +25% per purchase",
+    cost: 55,
+    maxPurchases: 10,
     apply() {
-      chunkDropChance = Math.min(0.95, chunkDropChance + 0.15);
+      brainrotIncomeMultiplier *= 1.25;
     }
   },
   {
-    id: "chunkBonus",
-    name: "+1 Chunk Value",
-    description: "Chunks are worth +1",
-    cost: 5,
+    id: "vault",
+    name: "Mega Vault",
+    description: "+6 factory slots per purchase",
+    cost: 45,
+    maxPurchases: 12,
     apply() {
-      chunkValue += 1;
+      factoryCapacity += 6;
     }
   },
   {
-    id: "extraBall",
-    name: "+1 Starting Ball",
-    description: "Launch one more ball each volley",
-    cost: 8,
+    id: "dropRate",
+    name: "Brainrot Magnet",
+    description: "+10% brainrot drop chance per purchase",
+    cost: 90,
+    maxPurchases: 5,
+    apply() {
+      brainrotDropMultiplier *= 1.1;
+    }
+  },
+  {
+    id: "paddle",
+    name: "Wide Catcher",
+    description: "Paddle width +12% per purchase",
+    cost: 70,
+    maxPurchases: 5,
+    apply() {
+      paddle.width = Math.min(WIDTH * 0.55, paddle.width * 1.12);
+    }
+  },
+  {
+    id: "multiball",
+    name: "Extra Launch",
+    description: "+1 permanent ball per purchase",
+    cost: 180,
+    maxPurchases: 5,
     apply() {
       permanentBallCount += 1;
-    }
-  },
-  {
-    id: "extraLife",
-    name: "+1 Max Life",
-    description: "Maximum lives +1, restore 1 life",
-    cost: 6,
-    apply() {
-      GameState.MaxLives += 1;
-      GameState.Lives += 1;
+      resetBalls();
     }
   }
 ];
-let extraLifeBoughtThisIntermission = false;
+
+const brainrotRarities = [
+  { name: "Brainrot God", chance: 1 / 256, color: "#ff3c8e", income: 18, sale: 160 },
+  { name: "Mythical", chance: 1 / 64, color: "#ff9b32", income: 7, sale: 60 },
+  { name: "Legendary", chance: 1 / 32, color: "#ffe14a", income: 3, sale: 25 },
+  { name: "Rare", chance: 1 / 10, color: "#46f0dc", income: 1.25, sale: 10 },
+  { name: "Uncommon", chance: 1 / 4, color: "#76ed5a", income: 0.55, sale: 4 },
+  { name: "Common", chance: 1 / 2, color: "#aeb6c2", income: 0.2, sale: 2 }
+];
 
 
 // ------------------------------------------------------------
@@ -149,12 +174,9 @@ let extraLifeBoughtThisIntermission = false;
 function update() {
   enemiesSystem(enemyEntities);
   movePaddle();
-  updateBrickChunks();
+  tickFactory();
 
   if (gameMode === "gameover") {
-    return;
-  }
-  if (gameMode === "intermission") {
     return;
   }
 
@@ -189,29 +211,54 @@ function updatePendingBallLaunches() {
     launch.ticksRemaining -= 1;
     if (launch.ticksRemaining > 0) continue;
 
-    const extraBall = createBall(launch.x, launch.y, true);
-    extraBall.state = "active";
-    extraBall.vx = launch.vx;
-    extraBall.vy = launch.vy;
-    balls.push(extraBall);
+    if (launch.ball) {
+      launch.ball.x = paddle.x + paddle.width / 2 - launch.ball.width / 2;
+      launch.ball.y = paddle.y - launch.ball.height;
+      launch.ball.state = "active";
+      launch.ball.vx = launch.vx;
+      launch.ball.vy = launch.vy;
+    } else {
+      const extraBall = createBall(launch.x, launch.y, true);
+      extraBall.state = "active";
+      extraBall.vx = launch.vx;
+      extraBall.vy = launch.vy;
+      balls.push(extraBall);
+    }
     pendingBallLaunches.splice(index, 1);
   }
 }
 
 function movePaddle() {
-  if (keys["arrowleft"] || keys["a"]) {
-    paddle.x = paddle.x - paddle.speed;
+  const movingLeft = Boolean(keys["arrowleft"] || keys["a"]);
+  const movingRight = Boolean(keys["arrowright"] || keys["d"]);
+  let direction = Number(movingRight) - Number(movingLeft);
+  if (paddle.wallDirection !== 0) {
+    if (direction === paddle.wallDirection) {
+      direction = 0;
+    } else {
+      paddle.wallDirection = 0;
+    }
   }
-  if (keys["arrowright"] || keys["d"]) {
-    paddle.x = paddle.x + paddle.speed;
+  if (direction === 0 && paddle.targetX !== null) {
+    direction = Math.sign(paddle.targetX - paddle.x);
+    if (Math.abs(paddle.targetX - paddle.x) < 1) {
+      paddle.targetX = null;
+      direction = 0;
+    }
   }
 
-  // Keep the paddle on the screen.
+  paddle.velocity += (direction * paddle.speed - paddle.velocity) * 0.25;
+  paddle.x += paddle.velocity;
   if (paddle.x < 0) {
     paddle.x = 0;
-  }
-  if (paddle.x + paddle.width > WIDTH) {
+    paddle.velocity = Math.abs(paddle.velocity);
+    paddle.targetX = null;
+    paddle.wallDirection = -1;
+  } else if (paddle.x + paddle.width > WIDTH) {
     paddle.x = WIDTH - paddle.width;
+    paddle.velocity = -Math.abs(paddle.velocity);
+    paddle.targetX = null;
+    paddle.wallDirection = 1;
   }
 }
 
@@ -228,11 +275,22 @@ function updateAim(event) {
 
 function launchBalls() {
   if (gameMode !== "playing" || volleyActive || balls.length === 0) return;
+  let launchIndex = 0;
   for (const ball of balls) {
     if (ball.state !== "held") continue;
-    ball.state = "active";
-    ball.vx = Math.sin(aimAngle) * BALL_SPEED;
-    ball.vy = -Math.cos(aimAngle) * BALL_SPEED;
+    const launch = {
+      ball,
+      vx: Math.sin(aimAngle) * BALL_SPEED,
+      vy: -Math.cos(aimAngle) * BALL_SPEED
+    };
+    if (launchIndex === 0) {
+      ball.state = "active";
+      ball.vx = launch.vx;
+      ball.vy = launch.vy;
+    } else {
+      pendingBallLaunches.push({ ...launch, ticksRemaining: launchIndex * 8 });
+    }
+    launchIndex += 1;
   }
   volleyActive = true;
 }
@@ -243,38 +301,18 @@ function finishVolley() {
   if (gameMode !== "playing") return;
 
   clearCompletedRows();
-  const rowsToDrop = Math.random() < 0.5 ? 1 : 2;
-  if (!dropBoardRows(rowsToDrop)) {
-    endGame("OUT OF LIVES");
-    return;
-  }
+  dropBoardRows(Math.random() < 0.5 ? 1 : 2);
   checkBottomRow();
-  if (gameMode !== "playing") return;
-
-  if (spawnedPieces < piecesThisWave) {
-    spawnFallingPiece();
-  } else {
-    beginIntermission();
-    return;
-  }
+  if (gameMode !== "gameover") spawnFallingPiece();
 }
 
 function dropBoardRows(rowCount) {
-  const bricksThatHitBottom = bricks.filter((brick) =>
-    brick.y + rowCount * BRICK_HEIGHT >= BOARD_BOTTOM
-  );
-  if (bricksThatHitBottom.length > 0) {
-    GameState.Lives -= 1;
-    if (GameState.Lives <= 0) {
-      GameState.Lives = 0;
-      return false;
-    }
-    bricks = bricks.filter((brick) => !bricksThatHitBottom.includes(brick));
-  }
+  const bricksThatHitBottom = bricks.filter((brick) => brick.y + rowCount * BRICK_HEIGHT >= BOARD_BOTTOM);
+  for (const brick of bricksThatHitBottom) stealBrainrots();
+  bricks = bricks.filter((brick) => !bricksThatHitBottom.includes(brick));
   for (const brick of bricks) {
     brick.y += rowCount * BRICK_HEIGHT;
   }
-  return true;
 }
 
 function spawnFallingPiece() {
@@ -301,7 +339,7 @@ function spawnFallingPiece() {
         continue;
       }
 
-      const minimumStrength = 1 + Math.floor((wave - 1) / GAME_CONFIG.fallingPieces.strengthWavesPerIncrease);
+      const minimumStrength = Math.min(5, 1 + Math.floor(GameState.Score / 300));
       const effectIndex = Math.floor(Math.random() * positions.length);
       const effects = ["ROW", "BALL"];
       const effect = effects[Math.floor(Math.random() * effects.length)];
@@ -314,7 +352,6 @@ function spawnFallingPiece() {
         )
       );
       bricks.push(...cells);
-      spawnedPieces += 1;
       return true;
     }
   }
@@ -348,92 +385,125 @@ function checkBottomRow() {
   const occupiedColumns = new Set(
     bricks.filter((brick) => brick.y === bottomY).map((brick) => Math.round(brick.x / BRICK_WIDTH))
   );
-  if (occupiedColumns.size === BRICK_COLUMNS) {
-    endGame("THE BOTTOM ROW IS FULL");
-  }
+  if (occupiedColumns.size === BRICK_COLUMNS) dropBoardRows(1);
 }
 
-function createBrickChunk(x, y) {
-  const settings = GAME_CONFIG.brickChunks;
-  brickChunks.push({
-    x,
-    y,
-    width: settings.size,
-    height: settings.size,
-    vx: (Math.random() - 0.5) * settings.horizontalSpread,
-    vy: settings.launchVelocity,
-    angle: 0
+function rollBrainrotRarity() {
+  for (const rarity of brainrotRarities) {
+    if (Math.random() < rarity.chance) return rarity;
+  }
+  return brainrotRarities[brainrotRarities.length - 1];
+}
+
+function createBrainrot() {
+  if (brainrots.length >= factoryCapacity) return;
+  const rarity = rollBrainrotRarity();
+  brainrots.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    rarity: rarity.name,
+    color: rarity.color,
+    income: rarity.income,
+    sale: rarity.sale,
+    storedCash: 0,
+    image: customBrainrotImage
   });
+  renderFactory();
 }
 
-function updateBrickChunks() {
-  for (let index = brickChunks.length - 1; index >= 0; index--) {
-    const chunk = brickChunks[index];
-    chunk.x += chunk.vx;
-    chunk.y += chunk.vy;
-    chunk.vy += GAME_CONFIG.brickChunks.gravity;
-    chunk.angle += GAME_CONFIG.brickChunks.rotationSpeed;
+function tickFactory() {
+  if (tickFactory.counter === undefined) tickFactory.counter = 0;
+  tickFactory.counter += 1;
+  if (tickFactory.counter < 60) return;
+  tickFactory.counter = 0;
+  const multiplier = factoryMultiplier * brainrotIncomeMultiplier;
+  for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
+  renderFactory();
+}
 
-    if (boxesTouch(chunk, paddle)) {
-      chunkBalance += chunkValue;
-      brickChunks.splice(index, 1);
-    } else if (chunk.y > HEIGHT) {
-      brickChunks.splice(index, 1);
-    }
+function claimBrainrot(id) {
+  const brainrot = brainrots.find((item) => item.id === id);
+  if (!brainrot) return;
+  cashBalance += Math.floor(brainrot.storedCash);
+  brainrot.storedCash -= Math.floor(brainrot.storedCash);
+  renderFactory();
+}
+
+function sellBrainrot(id) {
+  const index = brainrots.findIndex((item) => item.id === id);
+  if (index < 0) return;
+  cashBalance += brainrots[index].sale + Math.floor(brainrots[index].storedCash);
+  brainrots.splice(index, 1);
+  renderFactory();
+}
+
+function sellAllBrainrots() {
+  for (const brainrot of brainrots) cashBalance += brainrot.sale + Math.floor(brainrot.storedCash);
+  brainrots = [];
+  renderFactory();
+}
+
+function renderFactory() {
+  const grid = document.getElementById("factory-grid");
+  if (!grid) return;
+  document.getElementById("cash-balance").textContent = `$${Math.floor(cashBalance).toLocaleString()}`;
+  document.getElementById("factory-count").textContent = `${brainrots.length}/${factoryCapacity}`;
+  document.getElementById("factory-floors").textContent = `${factoryFloors} FLOOR${factoryFloors === 1 ? "" : "S"}`;
+  document.getElementById("factory-multiplier").textContent = `${factoryMultiplier.toFixed(2)}x FACTORY`;
+  document.getElementById("sell-all").disabled = brainrots.length === 0;
+  grid.replaceChildren();
+  for (const brainrot of brainrots) {
+    const card = document.createElement("article");
+    card.className = "brainrot";
+    card.style.setProperty("--rarity", brainrot.color);
+    const image = brainrot.image
+      ? `<img src="${brainrot.image}" alt="${brainrot.rarity} brainrot">`
+      : `<span class="brainrot-glyph" aria-hidden="true">${brainrot.rarity === "Brainrot God" ? "★" : brainrot.rarity[0]}</span>`;
+    card.innerHTML = `<button class="brainrot-main" data-claim="${brainrot.id}" aria-label="Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.rarity}">${image}<strong>${brainrot.rarity}</strong><span class="brainrot-bank">$${Math.floor(brainrot.storedCash).toLocaleString()} stored</span><span class="collect-label">COLLECT</span></button><div class="brainrot-actions"><button data-sell="${brainrot.id}" title="Sell brainrot">Sell $${brainrot.sale}</button></div>`;
+    grid.append(card);
+  }
+  renderShop();
+}
+
+function renderShop() {
+  const list = document.getElementById("upgrade-list");
+  if (!list) return;
+  document.getElementById("shop-cash").textContent = `$${Math.floor(cashBalance).toLocaleString()}`;
+  list.replaceChildren();
+  for (const upgrade of upgrades) {
+    const purchases = upgrade.purchases || 0;
+    const soldOut = upgrade.maxPurchases && purchases >= upgrade.maxPurchases;
+    const cost = upgradeCost(upgrade);
+    const item = document.createElement("article");
+    item.className = "upgrade-row";
+    item.innerHTML = `<div><strong>${upgrade.name}</strong><p>${upgrade.description}</p><small>${purchases ? `OWNED ${purchases}${upgrade.maxPurchases ? `/${upgrade.maxPurchases}` : ""}` : "AVAILABLE"}</small></div><button data-upgrade="${upgrade.id}" ${soldOut || cashBalance < cost ? "disabled" : ""}>${soldOut ? "MAX" : `$${cost}`}</button>`;
+    list.append(item);
   }
 }
 
-function chooseUpgrade(excludedId = null) {
-  const available = upgrades.filter((upgrade) =>
-    upgrade.id !== excludedId &&
-    (upgrade.id !== "extraLife" || !extraLifeBoughtThisIntermission) &&
-    (upgrade.id === "extraLife" || !purchasedUpgrades.has(upgrade.id))
-  );
-  if (available.length === 0) {
-    return null;
+function stealBrainrots() {
+  const stolenCount = Math.ceil(brainrots.length * 0.25);
+  for (let count = 0; count < stolenCount; count++) {
+    if (brainrots.length === 0) break;
+    const index = Math.floor(Math.random() * brainrots.length);
+    brainrots.splice(index, 1);
   }
-  return available[Math.floor(Math.random() * available.length)];
+  renderFactory();
 }
 
-function beginIntermission() {
-  gameMode = "intermission";
-  extraLifeBoughtThisIntermission = false;
-  upgradeOffers = [
-    upgrades.find((upgrade) => upgrade.id === "extraLife"),
-    chooseUpgrade("extraLife")
-  ];
-  if (upgradeOffers[0] && upgradeOffers[0].id === upgradeOffers[1]?.id) {
-    upgradeOffers[1] = chooseUpgrade(upgradeOffers[0].id);
-  }
+function upgradeCost(upgrade) {
+  return Math.floor(upgrade.cost * Math.pow(1.55, upgrade.purchases || 0));
 }
 
-function buyUpgrade(index) {
-  const upgrade = upgradeOffers[index];
-  if (!upgrade || purchasedUpgrades.has(upgrade.id)) {
-    return;
-  }
-  if (chunkBalance < upgrade.cost) {
-    return;
-  }
-
-  chunkBalance -= upgrade.cost;
+function buyUpgrade(id) {
+  const upgrade = upgrades.find((item) => item.id === id);
+  if (!upgrade || (upgrade.maxPurchases && (upgrade.purchases || 0) >= upgrade.maxPurchases)) return;
+  const cost = upgradeCost(upgrade);
+  if (cashBalance < cost) return;
+  cashBalance -= cost;
+  upgrade.purchases = (upgrade.purchases || 0) + 1;
   upgrade.apply();
-  if (upgrade.id === "extraLife") {
-    extraLifeBoughtThisIntermission = true;
-  } else {
-    purchasedUpgrades.add(upgrade.id);
-  }
-  upgradeOffers[index] = chooseUpgrade(upgradeOffers[1 - index]?.id);
-}
-
-function continueWave() {
-  wave += 1;
-  bricks = [];
-  spawnedPieces = 0;
-  piecesThisWave = GAME_CONFIG.fallingPieces.startingPieces + (wave - 1) * GAME_CONFIG.fallingPieces.extraPiecesPerWave;
-  resetBalls();
-  spawnFallingPiece();
-  gameMode = "playing";
+  renderShop();
+  renderFactory();
 }
 
 function endGame(reason) {
@@ -466,9 +536,15 @@ function frame(now) {
 }
 
 function start() {
-  piecesThisWave = GAME_CONFIG.fallingPieces.startingPieces;
+  try {
+    customBrainrotImage = localStorage.getItem("brickscape-brainrot-image") || "";
+  } catch {
+    customBrainrotImage = "";
+  }
   resetBalls();
   spawnFallingPiece();
+  renderShop();
+  renderFactory();
   lastTime = performance.now();
   requestAnimationFrame(frame);
 }
