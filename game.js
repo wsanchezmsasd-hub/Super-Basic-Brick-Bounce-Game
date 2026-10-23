@@ -78,7 +78,9 @@ let brainrotIncomeMultiplier = 1;
 let brainrotDropMultiplier = 1;
 const brainrotImageCache = new Map();
 const particles = [];
-const SELL_VALUE_MULTIPLIER = 7;
+const SELL_VALUE_MULTIPLIER = 21;
+const BRAINROT_INCOME_EVENT_MULTIPLIER = 6;
+const BRAINROT_INCOME_UPGRADE_STEP = 0.025;
 let viewMode = "title";
 let gameStarted = false;
 let particleEffectsEnabled = true;
@@ -114,11 +116,11 @@ const upgrades = [
   {
     id: "automation",
     name: "Turbo Belts",
-    description: "Brainrot income +25% per purchase",
+    description: "Brainrot income +2.5% per purchase",
     cost: 55,
     maxPurchases: 10,
     apply() {
-      brainrotIncomeMultiplier *= 1.25;
+      brainrotIncomeMultiplier = Number((brainrotIncomeMultiplier * (1 + BRAINROT_INCOME_UPGRADE_STEP)).toFixed(1));
     }
   },
   {
@@ -181,7 +183,6 @@ const brainrotRarities = [
 function update() {
   enemiesSystem(enemyEntities);
   movePaddle();
-  tickFactory();
   updateParticles();
 
   if (gameMode === "gameover") {
@@ -312,6 +313,7 @@ function finishVolley() {
   clearCompletedRows();
   dropBoardRows(Math.random() < 0.5 ? 1 : 2);
   checkBottomRow();
+  awardBrainrotIncome();
   if (gameMode !== "gameover") spawnFallingPiece();
 }
 
@@ -489,14 +491,11 @@ function updateFallingBrainrots() {
   }
 }
 
-function tickFactory() {
-  if (tickFactory.counter === undefined) tickFactory.counter = 0;
-  tickFactory.counter += 1;
-  if (tickFactory.counter < 60) return;
-  tickFactory.counter = 0;
-  const multiplier = factoryMultiplier * brainrotIncomeMultiplier;
+function awardBrainrotIncome() {
+  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER;
   for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
   const grid = document.getElementById("factory-grid");
+  if (!grid) return;
   for (const bank of grid.querySelectorAll("[data-bank]")) {
     const brainrot = brainrots.find((item) => item.id === bank.dataset.bank);
     if (brainrot) bank.textContent = `$${Math.floor(brainrot.storedCash).toLocaleString()} stored`;
@@ -602,7 +601,7 @@ function renderShop() {
     const cost = upgradeCost(upgrade);
     const item = document.createElement("article");
     item.className = "upgrade-row";
-    item.innerHTML = `<div><strong>${upgrade.name}</strong><p>${upgrade.description}</p><small>${purchases ? `OWNED ${purchases}${upgrade.maxPurchases ? `/${upgrade.maxPurchases}` : ""}` : "AVAILABLE"}</small></div><button data-upgrade="${upgrade.id}" ${soldOut || cashBalance < cost ? "disabled" : ""}>${soldOut ? "MAX" : `$${cost}`}</button>`;
+    item.innerHTML = `<div><strong>${upgrade.name}</strong><p>${upgrade.description}</p><small>${purchases ? `OWNED ${purchases}${upgrade.maxPurchases ? `/${upgrade.maxPurchases}` : ""}` : "AVAILABLE"}</small></div><button data-upgrade="${upgrade.id}" ${soldOut ? "disabled" : ""}>BUY $${Math.floor(cost).toLocaleString()}</button>`;
     list.append(item);
   }
 }
