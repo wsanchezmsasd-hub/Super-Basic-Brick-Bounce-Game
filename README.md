@@ -71,4 +71,15 @@ Each rarity has its own PNG. Edit a brainrot's name and choose a custom image ri
 
 Factory floors and vaults add capacity. Turbo Belts boost income. The Brainrot Magnet improves drop odds. Wide Catcher widens the paddle, and Extra Launch adds a ball. A brick reaching the bottom steals 25% of your brainrots, so keep that stack moving.
 
+## 🐆 FLOPPA // ASCENSION // REBIRTH
+
+Floppa never drops from bricks. He is sold only in the **UPGRADE LAB**, in three tiers: **$25,000**, then **$75,000**, then **$150,000**. He keeps his own picture, earns serious cash, takes no factory slot, and can't be sold or stolen.
+
+Buy all three and you **ASCEND**. The moment you buy the third one, an ascension cutscene plays (click, `SPACE`, `ENTER`, `ESC`, or **SKIP** to skip it). When it ends, pick one:
+
+- **GO BACK TO THE REAL WORLD** rebirths. Your run resets (cash, brainrots, upgrades, board, score) and you gain a permanent **+25% cash boost** on brainrot income and sale value. The 3 Floppa are spent on the trip.
+- **STAY IN BRICKROT** keeps your 3 Floppa. You can still rebirth any time you hold all 3 using the **GO BACK TO THE REAL WORLD** row at the top of the Upgrade Lab.
+
+Each rebirth adds another +25% (1.25x, 1.50x, 1.75x...). Tune the prices, Floppa's income, and the boost in the `floppa` block of `Config.js`.
+
 > **WARNING:** Side effects may include neon blindness, an unhealthy attachment to tiny collectible weirdos, and saying “one more volley” until sunrise. ⚠️
