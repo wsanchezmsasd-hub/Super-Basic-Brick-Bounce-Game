@@ -26,7 +26,7 @@
         <div class="factory-actions"><button id="sell-all" class="sell-all" disabled>SELL ALL BRAINROTS</button></div>
         <div id="factory-grid" class="factory-grid" aria-live="polite"></div>
         <p class="empty-factory">NO BRAINROTS IN THE BUILDING.<br>BREAK BRICKS, CATCH THEIR DROPS, THEN EDIT EACH NAME AND IMAGE.</p>
-        <div class="rarity-key"><span>COMMON</span><span>UNCOMMON</span><span>RARE</span><span>LEGENDARY</span><span>MYTHICAL</span><span>BRAINROT GOD</span></div>
+        <div class="rarity-key"><span>COMMON</span><span>UNCOMMON</span><span>RARE</span><span>LEGENDARY</span><span>MYTHICAL</span><span>BRAINROT GOD</span><span>FLOPPA (SHOP ONLY)</span></div>
       </section>
     </section>
   </main>
@@ -60,6 +60,41 @@
         <select id="game-speed"><option value="1">1× STANDARD</option><option value="2">2× TURBO</option><option value="4">4× PHONK</option></select>
       </label>
       <button id="settings-back" class="settings-button">← BACK TO TITLE</button>
+    </section>
+    <span class="title-orb orb-one" aria-hidden="true"></span>
+    <span class="title-orb orb-two" aria-hidden="true"></span>
+    <span class="title-orb orb-three" aria-hidden="true"></span>
+  </div>
+
+  <div id="ascension-screen" class="title-screen" hidden>
+    <div class="title-scanlines" aria-hidden="true"></div>
+    <div id="ascension-cutscene" class="ascension-cutscene" hidden>
+      <div class="cutscene-rays" aria-hidden="true"></div>
+      <div id="cutscene-sparks" class="cutscene-sparks" aria-hidden="true"></div>
+      <div class="cutscene-floppas" aria-hidden="true">
+        <img class="cutscene-floppa f1" src="floppa.png" alt="">
+        <img class="cutscene-floppa f2" src="floppa.png" alt="">
+        <img class="cutscene-floppa f3" src="floppa.png" alt="">
+      </div>
+      <div class="cutscene-captions" role="status">
+        <p class="cutscene-line" style="--delay: 0.9s">THE BRICKS STOP FALLING.</p>
+        <p class="cutscene-line" style="--delay: 2.7s">THE NEON FADES.</p>
+        <p class="cutscene-line" style="--delay: 4.5s">THREE FLOPPA LIFT YOU OUT.</p>
+        <p class="cutscene-line cutscene-final" style="--delay: 6.4s">YOU HAVE ASCENDED.</p>
+      </div>
+      <div class="cutscene-flash" aria-hidden="true"></div>
+      <button id="cutscene-skip" class="cutscene-skip" type="button">SKIP ▸</button>
+    </div>
+    <section id="ascension-choice" class="title-card ascension-card" role="dialog" aria-modal="true" aria-labelledby="ascension-heading" hidden>
+      <p class="title-eyebrow">✨ ALL 3 FLOPPA COLLECTED ✨</p>
+      <h2 id="ascension-heading" class="phonk-title ascension-title"><span>YOU HAVE</span><em>ASCENDED</em></h2>
+      <img class="ascension-floppa" src="floppa.png" alt="Floppa">
+      <p class="title-tagline">THE REAL WORLD IS CALLING.</p>
+      <p class="ascension-copy"><b>GO BACK TO THE REAL WORLD</b> to rebirth: your run resets and you gain a permanent +25% cash boost. Your Floppa come home with you.<br><b>STAY IN BRICKROT</b> to keep your 3 Floppa. You can still rebirth later from the Upgrade Lab.</p>
+      <div class="title-actions">
+        <button id="ascend-rebirth" class="start-button">GO BACK TO THE REAL WORLD</button>
+        <button id="ascend-stay" class="settings-button">STAY IN BRICKROT</button>
+      </div>
     </section>
     <span class="title-orb orb-one" aria-hidden="true"></span>
     <span class="title-orb orb-two" aria-hidden="true"></span>
