@@ -14,6 +14,18 @@ const HEIGHT = canvas.height; // 800
 
 const GameState = { Score: 0 };
 
+// Floppa's settings live in Config.js. These defaults only apply if an older Config.js
+// without a "floppa" block is loaded, so a partial file update can't break the shop.
+const FLOPPA_CONFIG = {
+  name: "Floppa",
+  image: "floppa.png",
+  color: "#e0a458",
+  costs: [25000, 75000, 150000],
+  income: 40,
+  rebirthBoost: 0.25,
+  ...GAME_CONFIG.floppa
+};
+
 
 // ------------------------------------------------------------
 // THE BALL
@@ -173,8 +185,8 @@ const upgrades = [
     id: "floppa",
     name: "Floppa",
     description: "Shop-only brainrot. Earns big cash, takes no slot, can't be sold or stolen. Buy all 3 to ascend.",
-    costs: GAME_CONFIG.floppa.costs,
-    maxPurchases: GAME_CONFIG.floppa.costs.length,
+    costs: FLOPPA_CONFIG.costs,
+    maxPurchases: FLOPPA_CONFIG.costs.length,
     apply() {
       addFloppa();
     }
@@ -570,11 +582,11 @@ function regularBrainrotCount() {
 }
 
 function hasAllFloppa() {
-  return floppaCount() >= GAME_CONFIG.floppa.costs.length;
+  return floppaCount() >= FLOPPA_CONFIG.costs.length;
 }
 
 function createFloppa() {
-  const floppa = GAME_CONFIG.floppa;
+  const floppa = FLOPPA_CONFIG;
   return {
     id: `floppa-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     rarity: "Floppa",
@@ -591,7 +603,7 @@ function createFloppa() {
 
 function addFloppa() {
   brainrots.push(createFloppa());
-  spawnParticles(WIDTH / 2, HEIGHT / 2, GAME_CONFIG.floppa.color, 40);
+  spawnParticles(WIDTH / 2, HEIGHT / 2, FLOPPA_CONFIG.color, 40);
   if (hasAllFloppa()) showAscension(true);
 }
 
@@ -671,7 +683,7 @@ function goBackToRealWorld() {
 // Starts a fresh run with a permanent cash boost. The 3 Floppa are spent on the trip home.
 function rebirth() {
   rebirthCount += 1;
-  rebirthMultiplier = 1 + GAME_CONFIG.floppa.rebirthBoost * rebirthCount;
+  rebirthMultiplier = 1 + FLOPPA_CONFIG.rebirthBoost * rebirthCount;
 
   cashBalance = 0;
   brainrots = [];
@@ -777,10 +789,10 @@ function renderShop() {
   document.getElementById("shop-cash").textContent = `$${Math.floor(cashBalance).toLocaleString()}`;
   list.replaceChildren();
   if (hasAllFloppa()) {
-    const boost = Math.round(GAME_CONFIG.floppa.rebirthBoost * 100);
+    const boost = Math.round(FLOPPA_CONFIG.rebirthBoost * 100);
     const ascend = document.createElement("article");
     ascend.className = "upgrade-row ascend-row";
-    ascend.innerHTML = `<div><strong>Go back to the real world</strong><p>You hold all ${GAME_CONFIG.floppa.costs.length} Floppa. Rebirth to restart with a permanent +${boost}% cash boost. Your Floppa come home with you.</p><small>REBIRTHS ${rebirthCount} · ${rebirthMultiplier.toFixed(2)}x BOOST</small></div><button data-ascend>REBIRTH</button>`;
+    ascend.innerHTML = `<div><strong>Go back to the real world</strong><p>You hold all ${FLOPPA_CONFIG.costs.length} Floppa. Rebirth to restart with a permanent +${boost}% cash boost. Your Floppa come home with you.</p><small>REBIRTHS ${rebirthCount} · ${rebirthMultiplier.toFixed(2)}x BOOST</small></div><button data-ascend>REBIRTH</button>`;
     list.append(ascend);
   }
   for (const upgrade of upgrades) {
