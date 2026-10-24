@@ -51,10 +51,11 @@ function positionHeldBalls() {
 // ------------------------------------------------------------
 // THE PADDLE
 // ------------------------------------------------------------
+const PADDLE_START_WIDTH = 90;
 const paddle = {
-  x: WIDTH / 2 - 45,
+  x: WIDTH / 2 - PADDLE_START_WIDTH / 2,
   y: HEIGHT - 45,
-  width: 90,
+  width: PADDLE_START_WIDTH,
   height: 12,
   speed: 7,
   velocity: 0,
@@ -71,11 +72,15 @@ let enemyEntities = [];
 let brainrots = [];
 let fallingBrainrots = [];
 let cashBalance = 0;
-let factoryCapacity = 8;
+const START_FACTORY_CAPACITY = 8;
+let factoryCapacity = START_FACTORY_CAPACITY;
 let factoryFloors = 1;
 let factoryMultiplier = 1;
 let brainrotIncomeMultiplier = 1;
 let brainrotDropMultiplier = 1;
+// Rebirths survive a rebirth: every trip back to the real world adds a permanent cash boost.
+let rebirthCount = 0;
+let rebirthMultiplier = 1;
 const brainrotImageCache = new Map();
 const particles = [];
 const SELL_VALUE_MULTIPLIER = 21;
@@ -162,6 +167,16 @@ const upgrades = [
     apply() {
       permanentBallCount += 1;
       resetBalls();
+    }
+  },
+  {
+    id: "floppa",
+    name: "Floppa",
+    description: "Shop-only brainrot. Earns big cash, takes no slot, can't be sold or stolen. Buy all 3 to ascend.",
+    costs: GAME_CONFIG.floppa.costs,
+    maxPurchases: GAME_CONFIG.floppa.costs.length,
+    apply() {
+      addFloppa();
     }
   }
 ];
@@ -478,7 +493,7 @@ function updateFallingBrainrots() {
     drop.y += drop.velocityY;
 
     if (boxesTouch(drop, paddle)) {
-      if (brainrots.length < factoryCapacity) {
+      if (regularBrainrotCount() < factoryCapacity) {
         brainrots.push(drop.brainrot);
         spawnParticles(drop.x + drop.width / 2, drop.y + drop.height / 2, drop.brainrot.color, 18);
         fallingBrainrots.splice(index, 1);
@@ -492,7 +507,7 @@ function updateFallingBrainrots() {
 }
 
 function awardBrainrotIncome() {
-  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER;
+  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * rebirthMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER;
   for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
   const grid = document.getElementById("factory-grid");
   if (!grid) return;
@@ -514,30 +529,189 @@ function claimBrainrot(id) {
   renderFactory();
 }
 
+function brainrotSaleValue(brainrot) {
+  return Math.floor(brainrot.sale * SELL_VALUE_MULTIPLIER * rebirthMultiplier);
+}
+
 function sellBrainrot(id) {
   const index = brainrots.findIndex((item) => item.id === id);
-  if (index < 0) return;
-  cashBalance += brainrots[index].sale * SELL_VALUE_MULTIPLIER + Math.floor(brainrots[index].storedCash);
+  if (index < 0 || brainrots[index].special) return;  // Floppa is not for sale
+  cashBalance += brainrotSaleValue(brainrots[index]) + Math.floor(brainrots[index].storedCash);
   brainrots.splice(index, 1);
   renderFactory();
 }
 
 function sellAllBrainrots() {
-  for (const brainrot of brainrots) cashBalance += brainrot.sale * SELL_VALUE_MULTIPLIER + Math.floor(brainrot.storedCash);
-  brainrots = [];
+  const kept = [];
+  for (const brainrot of brainrots) {
+    if (brainrot.special) {
+      kept.push(brainrot);
+      continue;
+    }
+    cashBalance += brainrotSaleValue(brainrot) + Math.floor(brainrot.storedCash);
+  }
+  brainrots = kept;
   renderFactory();
+}
+
+
+// ------------------------------------------------------------
+// FLOPPA, ASCENSION AND REBIRTH
+// Floppa is a special brainrot that is only sold in the shop. He lives in
+// the factory but takes no slot, cannot be sold or stolen, and has one
+// fixed picture. Owning all of him lets you ascend.
+// ------------------------------------------------------------
+function floppaCount() {
+  return brainrots.filter((brainrot) => brainrot.special).length;
+}
+
+function regularBrainrotCount() {
+  return brainrots.length - floppaCount();
+}
+
+function hasAllFloppa() {
+  return floppaCount() >= GAME_CONFIG.floppa.costs.length;
+}
+
+function createFloppa() {
+  const floppa = GAME_CONFIG.floppa;
+  return {
+    id: `floppa-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    rarity: "Floppa",
+    name: floppa.name,
+    defaultName: floppa.name,
+    color: floppa.color,
+    income: floppa.income,
+    sale: 0,
+    storedCash: 0,
+    image: floppa.image,
+    special: true
+  };
+}
+
+function addFloppa() {
+  brainrots.push(createFloppa());
+  spawnParticles(WIDTH / 2, HEIGHT / 2, GAME_CONFIG.floppa.color, 40);
+  if (hasAllFloppa()) showAscension(true);
+}
+
+// Buying the 3rd Floppa plays the ascension cutscene, then the choice card appears.
+// Reopening it later from the shop skips straight to the choice.
+const ASCENSION_CUTSCENE_MS = 8200;   // keep in sync with the cutscene CSS timings
+const ASCENSION_SKIP_GRACE_MS = 600;  // ignore skips right after it starts (double-clicks, key repeat)
+let ascensionPhase = "choice";        // "cutscene" while it plays, then "choice"
+let ascensionTimer = null;
+let ascensionStartedAt = 0;
+
+function buildCutsceneSparks() {
+  const box = document.getElementById("cutscene-sparks");
+  if (!box || box.childElementCount > 0) return;
+  for (let index = 0; index < 28; index++) {
+    const spark = document.createElement("span");
+    spark.style.setProperty("--x", `${(Math.random() * 100).toFixed(1)}%`);
+    spark.style.setProperty("--delay", `${(Math.random() * 6).toFixed(2)}s`);
+    spark.style.setProperty("--dur", `${(2.5 + Math.random() * 3).toFixed(2)}s`);
+    spark.style.setProperty("--size", `${(3 + Math.random() * 6).toFixed(1)}px`);
+    box.append(spark);
+  }
+}
+
+function showAscension(playCutscene = false) {
+  if (!hasAllFloppa()) return;
+  viewMode = "ascension";
+  document.getElementById("shop-backdrop").hidden = true;
+  clearTimeout(ascensionTimer);
+  // Players who ask for reduced motion go straight to the choice.
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (playCutscene && !reducedMotion) {
+    buildCutsceneSparks();
+    ascensionPhase = "cutscene";
+    ascensionStartedAt = performance.now();
+    ascensionTimer = setTimeout(endAscensionCutscene, ASCENSION_CUTSCENE_MS);
+  } else {
+    ascensionPhase = "choice";
+  }
+  renderMenu();
+}
+
+function endAscensionCutscene() {
+  clearTimeout(ascensionTimer);
+  if (viewMode !== "ascension" || ascensionPhase !== "cutscene") return;
+  ascensionPhase = "choice";
+  renderMenu();
+}
+
+function skipAscensionCutscene() {
+  if (ascensionPhase !== "cutscene") return;
+  if (performance.now() - ascensionStartedAt < ASCENSION_SKIP_GRACE_MS) return;
+  endAscensionCutscene();
+}
+
+function stayInBrickrot() {
+  clearTimeout(ascensionTimer);
+  ascensionPhase = "choice";
+  viewMode = "game";
+  renderMenu();
+  renderFactory();
+}
+
+function goBackToRealWorld() {
+  if (!hasAllFloppa()) {
+    stayInBrickrot();
+    return;
+  }
+  clearTimeout(ascensionTimer);
+  ascensionPhase = "choice";
+  rebirth();
+  viewMode = "game";
+  renderMenu();
+  renderFactory();
+}
+
+// Starts a fresh run with a permanent cash boost. The 3 Floppa are spent on the trip home.
+function rebirth() {
+  rebirthCount += 1;
+  rebirthMultiplier = 1 + GAME_CONFIG.floppa.rebirthBoost * rebirthCount;
+
+  cashBalance = 0;
+  brainrots = [];
+  fallingBrainrots = [];
+  bricks = [];
+  particles.length = 0;
+  GameState.Score = 0;
+  gameMode = "playing";
+  gameOverReason = "";
+
+  factoryCapacity = START_FACTORY_CAPACITY;
+  factoryFloors = 1;
+  factoryMultiplier = 1;
+  brainrotIncomeMultiplier = 1;
+  brainrotDropMultiplier = 1;
+  permanentBallCount = 1;
+  for (const upgrade of upgrades) upgrade.purchases = 0;
+
+  paddle.width = PADDLE_START_WIDTH;
+  paddle.x = WIDTH / 2 - PADDLE_START_WIDTH / 2;
+  paddle.velocity = 0;
+  paddle.targetX = null;
+  paddle.wallDirection = 0;
+
+  resetBalls();
+  spawnFallingPiece();
 }
 
 function renderFactory() {
   const grid = document.getElementById("factory-grid");
   if (!grid) return;
   document.getElementById("cash-balance").textContent = `$${Math.floor(cashBalance).toLocaleString()}`;
-  document.getElementById("factory-count").textContent = `${brainrots.length}/${factoryCapacity}`;
+  document.getElementById("factory-count").textContent = `${regularBrainrotCount()}/${factoryCapacity}`;
   document.getElementById("factory-floors").textContent = `${factoryFloors} FLOOR${factoryFloors === 1 ? "" : "S"}`;
-  document.getElementById("factory-multiplier").textContent = `${factoryMultiplier.toFixed(2)}x FACTORY`;
-  document.getElementById("sell-all").disabled = brainrots.length === 0;
+  document.getElementById("factory-multiplier").textContent = `${factoryMultiplier.toFixed(2)}x FACTORY${rebirthCount ? ` · ${rebirthMultiplier.toFixed(2)}x REBIRTH` : ""}`;
+  document.getElementById("sell-all").disabled = regularBrainrotCount() === 0;
   grid.replaceChildren();
-  for (const brainrot of brainrots) {
+  // Floppa goes first in the grid.
+  const orderedBrainrots = [...brainrots].sort((a, b) => Number(Boolean(b.special)) - Number(Boolean(a.special)));
+  for (const brainrot of orderedBrainrots) {
     const card = document.createElement("article");
     card.className = "brainrot";
     card.style.setProperty("--rarity", brainrot.color);
@@ -565,25 +739,32 @@ function renderFactory() {
 
     const actions = document.createElement("div");
     actions.className = "brainrot-actions";
-    const imagePicker = document.createElement("label");
-    imagePicker.className = "brainrot-image-picker";
-    imagePicker.append(document.createTextNode("SET IMAGE"));
-    const imageInput = document.createElement("input");
-    imageInput.type = "file";
-    imageInput.accept = "image/*";
-    imageInput.dataset.image = brainrot.id;
-    imageInput.setAttribute("aria-label", `Choose an image for ${brainrot.name}`);
-    imagePicker.append(imageInput);
 
     const collect = document.createElement("button");
     collect.dataset.claim = brainrot.id;
     collect.setAttribute("aria-label", `Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.name}`);
     collect.textContent = "COLLECT";
-    const sell = document.createElement("button");
-    sell.dataset.sell = brainrot.id;
-    sell.title = "Sell brainrot";
-    sell.textContent = `Sell $${brainrot.sale * SELL_VALUE_MULTIPLIER}`;
-    actions.append(imagePicker, collect, sell);
+
+    if (brainrot.special) {
+      // Floppa keeps his own picture and can't be sold: collect only.
+      actions.append(collect);
+    } else {
+      const imagePicker = document.createElement("label");
+      imagePicker.className = "brainrot-image-picker";
+      imagePicker.append(document.createTextNode("SET IMAGE"));
+      const imageInput = document.createElement("input");
+      imageInput.type = "file";
+      imageInput.accept = "image/*";
+      imageInput.dataset.image = brainrot.id;
+      imageInput.setAttribute("aria-label", `Choose an image for ${brainrot.name}`);
+      imagePicker.append(imageInput);
+
+      const sell = document.createElement("button");
+      sell.dataset.sell = brainrot.id;
+      sell.title = "Sell brainrot";
+      sell.textContent = `Sell $${brainrotSaleValue(brainrot)}`;
+      actions.append(imagePicker, collect, sell);
+    }
     card.append(image, details, actions);
     grid.append(card);
   }
@@ -595,6 +776,13 @@ function renderShop() {
   if (!list) return;
   document.getElementById("shop-cash").textContent = `$${Math.floor(cashBalance).toLocaleString()}`;
   list.replaceChildren();
+  if (hasAllFloppa()) {
+    const boost = Math.round(GAME_CONFIG.floppa.rebirthBoost * 100);
+    const ascend = document.createElement("article");
+    ascend.className = "upgrade-row ascend-row";
+    ascend.innerHTML = `<div><strong>Go back to the real world</strong><p>You hold all ${GAME_CONFIG.floppa.costs.length} Floppa. Rebirth to restart with a permanent +${boost}% cash boost. Your Floppa come home with you.</p><small>REBIRTHS ${rebirthCount} · ${rebirthMultiplier.toFixed(2)}x BOOST</small></div><button data-ascend>REBIRTH</button>`;
+    list.append(ascend);
+  }
   for (const upgrade of upgrades) {
     const purchases = upgrade.purchases || 0;
     const soldOut = upgrade.maxPurchases && purchases >= upgrade.maxPurchases;
@@ -607,17 +795,21 @@ function renderShop() {
 }
 
 function stealBrainrots() {
-  const stolenCount = Math.ceil(brainrots.length * 0.25);
+  // Floppa can't be stolen, so only regular brainrots are at risk.
+  const stolenCount = Math.ceil(regularBrainrotCount() * 0.25);
   for (let count = 0; count < stolenCount; count++) {
-    if (brainrots.length === 0) break;
-    const index = Math.floor(Math.random() * brainrots.length);
-    brainrots.splice(index, 1);
+    const candidates = brainrots.filter((brainrot) => !brainrot.special);
+    if (candidates.length === 0) break;
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    brainrots.splice(brainrots.indexOf(target), 1);
   }
   renderFactory();
 }
 
 function upgradeCost(upgrade) {
-  return Math.floor(upgrade.cost * Math.pow(1.55, upgrade.purchases || 0));
+  const purchases = upgrade.purchases || 0;
+  if (upgrade.costs) return upgrade.costs[Math.min(purchases, upgrade.costs.length - 1)];
+  return Math.floor(upgrade.cost * Math.pow(1.55, purchases));
 }
 
 function buyUpgrade(id) {
@@ -658,7 +850,10 @@ function beginGame() {
 function renderMenu() {
   const overlay = document.getElementById("title-screen");
   if (!overlay) return;
-  overlay.hidden = viewMode === "game";
+  overlay.hidden = viewMode === "game" || viewMode === "ascension";
+  document.getElementById("ascension-screen").hidden = viewMode !== "ascension";
+  document.getElementById("ascension-cutscene").hidden = viewMode !== "ascension" || ascensionPhase !== "cutscene";
+  document.getElementById("ascension-choice").hidden = viewMode !== "ascension" || ascensionPhase !== "choice";
   document.getElementById("title-menu").hidden = viewMode !== "title";
   document.getElementById("settings-menu").hidden = viewMode !== "settings";
   document.getElementById("start-game").textContent = gameStarted ? "RESUME GAME" : "START GAME";
