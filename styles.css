@@ -215,6 +215,7 @@ canvas {
 .rarity-key span:nth-child(4) { --rarity-color: #ffe14a; }
 .rarity-key span:nth-child(5) { --rarity-color: #ff9b32; }
 .rarity-key span:nth-child(6) { --rarity-color: #ff3c8e; }
+.rarity-key span:nth-child(7) { --rarity-color: #e0a458; }
 
 .shop-backdrop[hidden] { display: none; }
 .shop-backdrop { position: fixed; z-index: 5; inset: 0; display: flex; justify-content: flex-end; background: rgba(4, 5, 10, .78); backdrop-filter: blur(5px); }
@@ -285,12 +286,86 @@ canvas {
 .setting-row input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--pink); }
 .setting-row select { max-width: 180px; padding: 9px; border: 1px solid var(--cyan); color: var(--text); background: #111521; font: 900 11px "Trebuchet MS", sans-serif; }
 #settings-back { margin-top: 24px; }
+.ascension-title { font-size: clamp(42px, 10vw, 84px); }
+.ascension-floppa { display: block; width: clamp(110px, 24vw, 160px); aspect-ratio: 1; margin: 26px auto 0; object-fit: cover; border: 3px solid #e0a458; box-shadow: 6px 6px 0 var(--pink), 0 0 36px rgba(224, 164, 88, .45); }
+.ascension-copy { max-width: 540px; margin: 0 auto; color: #c4ccdb; font: 12px/1.7 "Trebuchet MS", sans-serif; }
+.ascension-copy b { color: var(--acid); }
+.ascend-row { border-bottom-color: var(--acid); background: rgba(234, 255, 69, .05); }
+.ascend-row button { flex-basis: 96px; }
+
+/* Ascension cutscene: plays for ~8s when the 3rd Floppa is bought (see ASCENSION_CUTSCENE_MS in game.js). */
+.ascension-cutscene { position: absolute; z-index: 2; inset: 0; overflow: hidden; cursor: pointer; animation: stage-out 700ms ease-in 7500ms both; }
+.ascension-cutscene[hidden] { display: none; }
+.cutscene-rays {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 170vmax;
+  height: 170vmax;
+  margin: -85vmax 0 0 -85vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 230, 120, .26) 0 5deg, transparent 5deg 15deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0, transparent 42%);
+  mask-image: radial-gradient(circle, #000 0, transparent 42%);
+  animation: rays-in 2200ms ease-out 300ms both, rays-spin 18s linear infinite;
+}
+.cutscene-sparks { position: absolute; inset: 0; pointer-events: none; }
+.cutscene-sparks span {
+  position: absolute;
+  bottom: -12px;
+  left: var(--x);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 10px 3px rgba(255, 230, 120, .8);
+  opacity: 0;
+  animation: spark-rise var(--dur) linear var(--delay) infinite;
+}
+.cutscene-sparks span:nth-child(3n) { background: var(--pink); box-shadow: 0 0 10px 3px rgba(255, 76, 174, .8); }
+.cutscene-sparks span:nth-child(3n + 1) { background: var(--cyan); box-shadow: 0 0 10px 3px rgba(72, 243, 224, .8); }
+.cutscene-floppas { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: clamp(14px, 4vw, 48px); pointer-events: none; }
+.cutscene-floppa {
+  width: clamp(84px, 19vw, 190px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 3px solid #e0a458;
+  box-shadow: 6px 6px 0 var(--pink), 0 0 44px rgba(224, 164, 88, .6);
+  opacity: 0;
+  animation: cutscene-rise 7000ms cubic-bezier(.25, .6, .3, 1) var(--delay, 0s) both;
+}
+.cutscene-floppa.f1 { --delay: 900ms; }
+.cutscene-floppa.f2 { --delay: 300ms; width: clamp(110px, 25vw, 250px); }
+.cutscene-floppa.f3 { --delay: 1500ms; }
+.cutscene-captions { position: absolute; right: 0; bottom: 9vh; left: 0; height: 90px; text-align: center; pointer-events: none; }
+.cutscene-line {
+  position: absolute;
+  inset: 0 12px auto;
+  margin: 0;
+  color: #fff;
+  font: 900 clamp(18px, 4vw, 34px)/1.1 Impact, sans-serif;
+  letter-spacing: 3px;
+  text-shadow: 3px 3px 0 var(--pink), -2px -2px 0 var(--cyan), 0 0 24px rgba(255, 76, 174, .6);
+  opacity: 0;
+  animation: cutscene-line 2000ms ease-in-out var(--delay) both;
+}
+.cutscene-final { color: var(--acid); font-size: clamp(30px, 7vw, 64px); animation-name: cutscene-line-final; animation-duration: 1400ms; }
+.cutscene-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: flash-out 1500ms ease-out both; }
+.cutscene-skip { position: absolute; z-index: 3; right: 18px; bottom: 18px; color: #fff; background: rgba(34, 32, 52, .85); box-shadow: 3px 3px 0 var(--cyan); animation: skip-in 600ms ease-out 1200ms both; }
 .title-orb { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--acid); box-shadow: 0 0 14px 4px currentColor; animation: float-orb 4s ease-in-out infinite; }
 .orb-one { top: 18%; left: 14%; color: var(--pink); }
 .orb-two { top: 72%; right: 15%; color: var(--cyan); animation-delay: -1.3s; }
 .orb-three { right: 22%; top: 20%; color: var(--acid); animation-delay: -2.1s; }
 
 @keyframes pulse { 50% { opacity: .38; } }
+@keyframes stage-out { to { opacity: 0; } }
+@keyframes rays-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rays-spin { to { transform: rotate(360deg); } }
+@keyframes flash-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes skip-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spark-rise { 0% { opacity: 0; transform: translateY(0); } 10% { opacity: 1; } 100% { opacity: 0; transform: translateY(-110vh); } }
+@keyframes cutscene-rise { 0% { opacity: 0; transform: translateY(60vh) scale(.6); } 18% { opacity: 1; } 100% { opacity: 1; transform: translateY(-14vh) scale(1.08); } }
+@keyframes cutscene-line { 0% { opacity: 0; transform: translateY(10px); } 18%, 78% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-6px); } }
+@keyframes cutscene-line-final { 0% { opacity: 0; transform: translateY(10px) scale(.94); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes pop-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 @keyframes slide-in { from { transform: translateX(24px); opacity: .5; } to { transform: translateX(0); opacity: 1; } }
 @keyframes scan { to { transform: translateY(10px); } }
@@ -323,4 +398,3 @@ canvas {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
-
