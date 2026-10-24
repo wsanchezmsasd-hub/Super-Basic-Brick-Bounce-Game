@@ -20,7 +20,14 @@ document.addEventListener("keydown", function (event) {
     } else if (viewMode === "settings") {
       viewMode = "title";
       renderMenu();
+    } else if (viewMode === "ascension") {
+      // First ESC skips the cutscene, ESC on the choice card means stay.
+      if (ascensionPhase === "cutscene") skipAscensionCutscene();
+      else stayInBrickrot();
     }
+  }
+  if (!event.repeat && viewMode === "ascension" && ascensionPhase === "cutscene" && (key === " " || key === "enter")) {
+    skipAscensionCutscene();
   }
   if (!event.repeat && viewMode === "game" && gameMode === "playing" && (key === " " || key === "enter")) {
     launchBalls();
@@ -99,9 +106,16 @@ document.getElementById("factory-grid").addEventListener("change", (event) => {
   reader.readAsDataURL(file);
 });
 document.getElementById("upgrade-list").addEventListener("click", (event) => {
+  if (event.target.closest("[data-ascend]")) {
+    showAscension();
+    return;
+  }
   const button = event.target.closest("[data-upgrade]");
   if (button) buyUpgrade(button.dataset.upgrade);
 });
+document.getElementById("ascension-cutscene").addEventListener("click", skipAscensionCutscene);
+document.getElementById("ascend-rebirth").addEventListener("click", goBackToRealWorld);
+document.getElementById("ascend-stay").addEventListener("click", stayInBrickrot);
 document.addEventListener("keyup", function (event) {
   keys[event.key.toLowerCase()] = false;
 });
