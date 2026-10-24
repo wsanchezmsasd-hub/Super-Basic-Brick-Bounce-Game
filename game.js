@@ -14,8 +14,12 @@ const HEIGHT = canvas.height; // 800
 
 const GameState = { Score: 0 };
 
+
 // ------------------------------------------------------------
 // THE BALL
+// x and y are the top-left corner. vx and vy are how many pixels
+// the ball moves each update (vx = sideways, vy = up/down).
+// A positive vy means the ball is moving DOWN the screen.
 // ------------------------------------------------------------
 const BALL_SPEED = 4;
 let permanentBallCount = 1;
@@ -43,6 +47,7 @@ function positionHeldBalls() {
   }
 }
 
+
 // ------------------------------------------------------------
 // THE PADDLE
 // ------------------------------------------------------------
@@ -57,6 +62,7 @@ const paddle = {
   wallDirection: 0
 };
 
+
 // ------------------------------------------------------------
 // FALLING TETRIS PIECES
 // ------------------------------------------------------------
@@ -70,13 +76,11 @@ let factoryFloors = 1;
 let factoryMultiplier = 1;
 let brainrotIncomeMultiplier = 1;
 let brainrotDropMultiplier = 1;
-let cloverStacks = 0;
 const brainrotImageCache = new Map();
 const particles = [];
 const SELL_VALUE_MULTIPLIER = 21;
 const BRAINROT_INCOME_EVENT_MULTIPLIER = 6;
 const BRAINROT_INCOME_UPGRADE_STEP = 0.025;
-const MAX_CLOVER_STACKS = 3;
 let viewMode = "title";
 let gameStarted = false;
 let particleEffectsEnabled = true;
@@ -159,16 +163,6 @@ const upgrades = [
       permanentBallCount += 1;
       resetBalls();
     }
-  },
-  {
-    id: "brainroted-clover",
-    name: "Brainroted Clover",
-    description: "Each stack makes common/uncommon drops rarer and rare+ drops more common (max 3)",
-    cost: 220,
-    maxPurchases: MAX_CLOVER_STACKS,
-    apply() {
-      cloverStacks = Math.min(MAX_CLOVER_STACKS, cloverStacks + 1);
-    }
   }
 ];
 
@@ -181,6 +175,11 @@ const brainrotRarities = [
   { name: "Common", brainrotName: "Tung Tung Tung sahur", image: "common.png", chance: 1 / 2, color: "#aeb6c2", income: 0.2, sale: 2 }
 ];
 
+
+// ------------------------------------------------------------
+// UPDATE: runs 60 times every second. Move things, then check
+// what they touched.
+// ------------------------------------------------------------
 function update() {
   enemiesSystem(enemyEntities);
   movePaddle();
@@ -401,42 +400,22 @@ function checkBottomRow() {
 }
 
 function rollBrainrotRarity() {
-  const rarityWeights = brainrotRarities.map((rarity) => {
-    let weight = rarity.chance;
-    if (cloverStacks > 0) {
-      if (rarity.name === "Common" || rarity.name === "Uncommon") {
-        weight *= Math.max(0.08, 1 - cloverStacks * 0.18);
-      } else {
-        weight *= 1 + cloverStacks * 0.25;
-      }
-    }
-    return { rarity, weight };
-  });
-
-  const totalWeight = rarityWeights.reduce((total, entry) => total + entry.weight, 0);
-  let roll = Math.random() * totalWeight;
-
-  for (const entry of rarityWeights) {
-    roll -= entry.weight;
-    if (roll <= 0) {
-      return entry.rarity;
-    }
+  for (const rarity of brainrotRarities) {
+    if (Math.random() < rarity.chance) return rarity;
   }
-
   return brainrotRarities[brainrotRarities.length - 1];
 }
 
 function createBrainrot(rarityName) {
   const rarity = brainrotRarities.find((item) => item.name === rarityName);
-  if (!rarity) return null;
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     rarity: rarity.name,
     name: rarity.brainrotName,
     defaultName: rarity.brainrotName,
     color: rarity.color,
-    income: rarity.income * 2,
-    sale: Math.max(1, rarity.sale * 0.8),
+    income: rarity.income,
+    sale: rarity.sale,
     storedCash: 0,
     image: rarity.image
   };
@@ -473,31 +452,17 @@ function updateParticles() {
 }
 
 function getBrainrotImage(source) {
-  const resolvedSource = source || "common.png";
-  if (!brainrotImageCache.has(resolvedSource)) {
+  if (!brainrotImageCache.has(source)) {
     const image = new Image();
-    image.decoding = "async";
-    image.onerror = () => {
-      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-          <rect width="128" height="128" fill="#160b1f"/>
-          <circle cx="64" cy="46" r="24" fill="#f2b868"/>
-          <rect x="36" y="66" width="56" height="30" rx="16" fill="#f4d274"/>
-          <path d="M40 90 L64 112 L88 90" fill="none" stroke="#f4d274" stroke-width="10" stroke-linecap="round"/>
-        </svg>
-      `)}`;
-    };
-    image.src = resolvedSource;
-    brainrotImageCache.set(resolvedSource, image);
+    image.src = source;
+    brainrotImageCache.set(source, image);
   }
-  return brainrotImageCache.get(resolvedSource);
+  return brainrotImageCache.get(source);
 }
 
 function spawnBrainrotDrop(rarityName, brick) {
-  const brainrot = createBrainrot(rarityName);
-  if (!brainrot) return;
   fallingBrainrots.push({
-    brainrot,
+    brainrot: createBrainrot(rarityName),
     x: brick.x + (brick.width - BRICK_WIDTH / 2) / 2,
     y: brick.y + (brick.height - BRICK_WIDTH / 2) / 2,
     width: BRICK_WIDTH / 2,
@@ -708,6 +673,12 @@ function renderMenu() {
   document.getElementById("game-speed").value = String(gameSpeed);
 }
 
+
+// ------------------------------------------------------------
+// THE GAME LOOP
+// The browser calls frame() every time it is ready to draw. Updates
+// use fixed 60 Hz steps, with held Space feeding the simulation faster.
+// ------------------------------------------------------------
 const STEP = 1000 / 60;
 let lastTime = 0;
 let leftover = 0;
