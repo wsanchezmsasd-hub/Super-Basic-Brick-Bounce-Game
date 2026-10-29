@@ -26,8 +26,6 @@ const FLOPPA_CONFIG = {
   ...GAME_CONFIG.floppa
 };
 
-const FRENZY_MULTIPLIER = 1.5;
-let frenzyRoundsRemaining = 0;
 
 // ------------------------------------------------------------
 // THE BALL
@@ -204,9 +202,6 @@ const brainrotRarities = [
   { name: "Common", brainrotName: "Tung Tung Tung sahur", image: "common.png", chance: 1 / 2, color: "#aeb6c2", income: 0.2, sale: 2 }
 ];
 
-function activateFrenzyBrick() {
-  frenzyRoundsRemaining = 2;
-}
 
 // ------------------------------------------------------------
 // UPDATE: runs 60 times every second. Move things, then check
@@ -524,12 +519,8 @@ function updateFallingBrainrots() {
 }
 
 function awardBrainrotIncome() {
-  const frenzyBoost = frenzyRoundsRemaining > 0 ? FRENZY_MULTIPLIER : 1;
-  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * rebirthMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER * frenzyBoost;
+  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * rebirthMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER;
   for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
-  if (frenzyRoundsRemaining > 0) {
-    frenzyRoundsRemaining -= 1;
-  }
   const grid = document.getElementById("factory-grid");
   if (!grid) return;
   for (const bank of grid.querySelectorAll("[data-bank]")) {
@@ -702,7 +693,6 @@ function rebirth() {
   GameState.Score = 0;
   gameMode = "playing";
   gameOverReason = "";
-  frenzyRoundsRemaining = 0;
 
   factoryCapacity = START_FACTORY_CAPACITY;
   factoryFloors = 1;

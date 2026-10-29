@@ -88,12 +88,6 @@ function bounceOffBricks(ball) {
     brick.hitsRemaining -= 1;
     if (brick.hitsRemaining <= 0) {
       spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#ff4cae", 22);
-
-      if (brick.specialType === "FRENZY") {
-        activateFrenzyBrick();
-        spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#ffd34d", 28);
-      }
-
       if (brick.effect === "ROW") {
         const rowBricks = bricks.filter((candidate) => candidate.y === brick.y);
         for (const rowBrick of rowBricks) {
