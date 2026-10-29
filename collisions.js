@@ -1,110 +1,927 @@
 // ============================================================
-// collisions.js: what happens when the ball touches something
+// BLOCK BREAKER (base game)
 //
-// To "bounce", we flip the ball's speed:
-//   hit something sideways -> vx = -vx
-//   hit something above or below -> vy = -vy
+// game.js  = the canvas, the ball, the paddle, and the game loop
+// bricks.js     = where the bricks are and how they are drawn
+// collisions.js = what happens when the ball touches things
 // ============================================================
 
-// Returns true if two rectangles (like the ball and a brick) overlap.
-function boxesTouch(a, b) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const WIDTH = canvas.width;   // 600
+const HEIGHT = canvas.height; // 800
+
+const GameState = { Score: 0 };
+
+// Floppa's settings live in Config.js. These defaults only apply if an older Config.js
+// without a "floppa" block is loaded, so a partial file update can't break the shop.
+const FLOPPA_CONFIG = {
+  name: "Floppa",
+  image: "floppa.png",
+  color: "#e0a458",
+  costs: [25000, 75000, 150000],
+  income: 40,
+  rebirthBoost: 0.25,
+  ...GAME_CONFIG.floppa
+};
+
+const FRENZY_MULTIPLIER = 1.5;
+let frenzyRoundsRemaining = 0;
+
+// ------------------------------------------------------------
+// THE BALL
+// x and y are the top-left corner. vx and vy are how many pixels
+// the ball moves each update (vx = sideways, vy = up/down).
+// A positive vy means the ball is moving DOWN the screen.
+// ------------------------------------------------------------
+const BALL_SPEED = 4;
+let permanentBallCount = 1;
+let balls = [];
+let pendingBallLaunches = [];
+let aimAngle = 0;
+let volleyActive = false;
+
+function createBall(x, y, temporary = false) {
+  return { x, y, width: 18, height: 18, vx: 0, vy: 0, state: "held", temporary };
+}
+
+function resetBalls() {
+  balls = Array.from({ length: permanentBallCount }, () => createBall());
+  pendingBallLaunches = [];
+  volleyActive = false;
+  positionHeldBalls();
+}
+
+function positionHeldBalls() {
+  for (const ball of balls) {
+    if (ball.state !== "held") continue;
+    ball.x = paddle.x + paddle.width / 2 - ball.width / 2;
+    ball.y = paddle.y - ball.height;
+  }
 }
 
 
-// The ball bounces off the left, right, and top walls.
-function bounceOffWalls(ball) {
-  if (ball.x < 0) {
-    ball.x = 0;
-    ball.vx = -ball.vx;
+// ------------------------------------------------------------
+// THE PADDLE
+// ------------------------------------------------------------
+const PADDLE_START_WIDTH = 90;
+const paddle = {
+  x: WIDTH / 2 - PADDLE_START_WIDTH / 2,
+  y: HEIGHT - 45,
+  width: PADDLE_START_WIDTH,
+  height: 12,
+  speed: 7,
+  velocity: 0,
+  targetX: null,
+  wallDirection: 0
+};
+
+
+// ------------------------------------------------------------
+// FALLING TETRIS PIECES
+// ------------------------------------------------------------
+let bricks = [];
+let enemyEntities = [];
+let brainrots = [];
+let fallingBrainrots = [];
+let cashBalance = 0;
+const START_FACTORY_CAPACITY = 8;
+let factoryCapacity = START_FACTORY_CAPACITY;
+let factoryFloors = 1;
+let factoryMultiplier = 1;
+let brainrotIncomeMultiplier = 1;
+let brainrotDropMultiplier = 1;
+// Rebirths survive a rebirth: every trip back to the real world adds a permanent cash boost.
+let rebirthCount = 0;
+let rebirthMultiplier = 1;
+const brainrotImageCache = new Map();
+const particles = [];
+const SELL_VALUE_MULTIPLIER = 21;
+const BRAINROT_INCOME_EVENT_MULTIPLIER = 6;
+const BRAINROT_INCOME_UPGRADE_STEP = 0.025;
+let viewMode = "title";
+let gameStarted = false;
+let particleEffectsEnabled = true;
+let gameSpeed = 1;
+let gameMode = "playing";
+let gameOverReason = "";
+
+const upgrades = [
+  {
+    id: "floor2",
+    name: "Factory: Floor 2",
+    description: "+8 slots and a permanent 1.1x factory multiplier",
+    cost: 120,
+    maxPurchases: 1,
+    apply() {
+      factoryFloors += 1;
+      factoryCapacity += 8;
+      factoryMultiplier *= 1.1;
+    }
+  },
+  {
+    id: "floor3",
+    name: "Factory: Floor 3",
+    description: "+12 slots and a permanent 1.25x factory multiplier",
+    cost: 640,
+    maxPurchases: 1,
+    apply() {
+      factoryFloors += 1;
+      factoryCapacity += 12;
+      factoryMultiplier *= 1.25;
+    }
+  },
+  {
+    id: "automation",
+    name: "Turbo Belts",
+    description: "Brainrot income +2.5% per purchase",
+    cost: 55,
+    maxPurchases: 10,
+    apply() {
+      brainrotIncomeMultiplier = Number((brainrotIncomeMultiplier * (1 + BRAINROT_INCOME_UPGRADE_STEP)).toFixed(1));
+    }
+  },
+  {
+    id: "vault",
+    name: "Mega Vault",
+    description: "+6 factory slots per purchase",
+    cost: 45,
+    maxPurchases: 12,
+    apply() {
+      factoryCapacity += 6;
+    }
+  },
+  {
+    id: "dropRate",
+    name: "Brainrot Magnet",
+    description: "+10% brainrot drop chance per purchase",
+    cost: 90,
+    maxPurchases: 5,
+    apply() {
+      brainrotDropMultiplier *= 1.1;
+    }
+  },
+  {
+    id: "paddle",
+    name: "Wide Catcher",
+    description: "Paddle width +12% per purchase",
+    cost: 70,
+    maxPurchases: 5,
+    apply() {
+      paddle.width = Math.min(WIDTH * 0.55, paddle.width * 1.12);
+    }
+  },
+  {
+    id: "multiball",
+    name: "Extra Launch",
+    description: "+1 permanent ball per purchase",
+    cost: 180,
+    maxPurchases: 5,
+    apply() {
+      permanentBallCount += 1;
+      resetBalls();
+    }
+  },
+  {
+    id: "floppa",
+    name: "Floppa",
+    description: "Shop-only brainrot. Earns big cash, takes no slot, can't be sold or stolen. Buy all 3 to ascend.",
+    costs: FLOPPA_CONFIG.costs,
+    maxPurchases: FLOPPA_CONFIG.costs.length,
+    apply() {
+      addFloppa();
+    }
   }
-  if (ball.x + ball.width > WIDTH) {
-    ball.x = WIDTH - ball.width;
-    ball.vx = -ball.vx;
-  }
-  if (ball.y < 0) {
-    ball.y = 0;
-    ball.vy = -ball.vy;
-  }
+];
+
+const brainrotRarities = [
+  { name: "Brainrot God", brainrotName: "la vaca saturno saturnita", image: "brainrotgod.png", chance: 1 / 256, color: "#ff3c8e", income: 18, sale: 160 },
+  { name: "Mythical", brainrotName: "tralalelo tralala", image: "mythical.png", chance: 1 / 64, color: "#ff9b32", income: 7, sale: 60 },
+  { name: "Legendary", brainrotName: "bombodido crocodilo", image: "legendary.png", chance: 1 / 32, color: "#ffe14a", income: 3, sale: 25 },
+  { name: "Rare", brainrotName: "ballerina cappuccina", image: "rare.png", chance: 1 / 10, color: "#46f0dc", income: 1.25, sale: 10 },
+  { name: "Uncommon", brainrotName: "lirili larila", image: "uncommon.png", chance: 1 / 4, color: "#76ed5a", income: 0.55, sale: 4 },
+  { name: "Common", brainrotName: "Tung Tung Tung sahur", image: "common.png", chance: 1 / 2, color: "#aeb6c2", income: 0.2, sale: 2 }
+];
+
+function activateFrenzyBrick() {
+  frenzyRoundsRemaining = 2;
 }
 
-function bounceOffBottom(ball) {
-  if (ball.y + ball.height < HEIGHT || ball.vy <= 0) {
+// ------------------------------------------------------------
+// UPDATE: runs 60 times every second. Move things, then check
+// what they touched.
+// ------------------------------------------------------------
+function update() {
+  enemiesSystem(enemyEntities);
+  movePaddle();
+  updateParticles();
+
+  if (gameMode === "gameover") {
     return;
   }
 
-  ball.state = "held";
-  ball.vx = 0;
-  ball.vy = 0;
-}
+  updateFallingBrainrots();
+  updatePendingBallLaunches();
+  positionHeldBalls();
+  if (!volleyActive) {
+    return;
+  }
 
+  for (let index = balls.length - 1; index >= 0; index--) {
+    const ball = balls[index];
+    if (ball.state !== "active") continue;
+    moveBall(ball);
+    bounceOffWalls(ball);
+    bounceOffPaddle(ball);
+    bounceOffBottom(ball);
+    if (ball.state === "active") bounceOffBricks(ball);
+  }
 
-// A descending ball is caught and held for the next volley.
-function bounceOffPaddle(ball) {
-  if (boxesTouch(ball, paddle) && ball.vy > 0) {
-    ball.state = "held";
-    ball.vx = 0;
-    ball.vy = 0;
+  if (balls.every((ball) => ball.state === "held") && pendingBallLaunches.length === 0) {
+    finishVolley();
   }
 }
 
+function scheduleExtraBall(x, y, vx, vy) {
+  pendingBallLaunches.push({ x, y, vx, vy, ticksRemaining: 12 });
+}
 
-// The ball bounces off blocks and damages the one it hits.
-function bounceOffBricks(ball) {
-  for (let index = 0; index < bricks.length; index++) {
-    const brick = bricks[index];
-    if (!boxesTouch(ball, brick)) {
-      continue;  // not touching this brick, check the next one
-    }
+function updatePendingBallLaunches() {
+  for (let index = pendingBallLaunches.length - 1; index >= 0; index--) {
+    const launch = pendingBallLaunches[index];
+    launch.ticksRemaining -= 1;
+    if (launch.ticksRemaining > 0) continue;
 
-    // How far has the ball pushed into the brick on each side?
-    const overlapX = Math.min(ball.x + ball.width, brick.x + brick.width) - Math.max(ball.x, brick.x);
-    const overlapY = Math.min(ball.y + ball.height, brick.y + brick.height) - Math.max(ball.y, brick.y);
-
-    if (overlapX < overlapY) {
-      // The ball hit the brick's left or right side.
-      ball.vx = -ball.vx;
-      if (ball.x < brick.x) {
-        ball.x = brick.x - ball.width;     // left of the brick
-      } else {
-        ball.x = brick.x + brick.width;    // right of the brick
-      }
+    if (launch.ball) {
+      launch.ball.x = paddle.x + paddle.width / 2 - launch.ball.width / 2;
+      launch.ball.y = paddle.y - launch.ball.height;
+      launch.ball.state = "active";
+      launch.ball.vx = launch.vx;
+      launch.ball.vy = launch.vy;
     } else {
-      // The ball hit the brick's top or bottom.
-      ball.vy = -ball.vy;
-      if (ball.y < brick.y) {
-        ball.y = brick.y - ball.height;    // above the brick
-      } else {
-        ball.y = brick.y + brick.height;   // below the brick
-      }
+      const extraBall = createBall(launch.x, launch.y, true);
+      extraBall.state = "active";
+      extraBall.vx = launch.vx;
+      extraBall.vy = launch.vy;
+      balls.push(extraBall);
     }
-
-    spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#fff45c", 5);
-    brick.hitsRemaining -= 1;
-    if (brick.hitsRemaining <= 0) {
-      spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#ff4cae", 22);
-      if (brick.effect === "ROW") {
-        const rowBricks = bricks.filter((candidate) => candidate.y === brick.y);
-        for (const rowBrick of rowBricks) {
-          if (rowBrick.brainrotRarity) spawnBrainrotDrop(rowBrick.brainrotRarity, rowBrick);
-        }
-        GameState.Score += rowBricks.length * 10;
-        bricks = bricks.filter((candidate) => candidate.y !== brick.y);
-      } else {
-        if (brick.brainrotRarity) spawnBrainrotDrop(brick.brainrotRarity, brick);
-        GameState.Score += 10;
-        bricks.splice(index, 1);
-      }
-      if (brick.effect === "BALL") {
-        scheduleExtraBall(ball.x, ball.y, -ball.vx, ball.vy);
-      }
-    }
-
-    break;  // bounce off one brick per update, then stop looking
+    pendingBallLaunches.splice(index, 1);
   }
 }
+
+function movePaddle() {
+  const movingLeft = Boolean(keys["arrowleft"] || keys["a"]);
+  const movingRight = Boolean(keys["arrowright"] || keys["d"]);
+  let direction = Number(movingRight) - Number(movingLeft);
+  if (paddle.wallDirection !== 0) {
+    if (direction === paddle.wallDirection) {
+      direction = 0;
+    } else {
+      paddle.wallDirection = 0;
+    }
+  }
+  if (direction === 0 && paddle.targetX !== null) {
+    direction = Math.sign(paddle.targetX - paddle.x);
+    if (Math.abs(paddle.targetX - paddle.x) < 1) {
+      paddle.targetX = null;
+      direction = 0;
+    }
+  }
+
+  paddle.velocity += (direction * paddle.speed - paddle.velocity) * 0.25;
+  paddle.x += paddle.velocity;
+  if (paddle.x < 0) {
+    paddle.x = 0;
+    paddle.velocity = Math.abs(paddle.velocity);
+    paddle.targetX = null;
+    paddle.wallDirection = -1;
+  } else if (paddle.x + paddle.width > WIDTH) {
+    paddle.x = WIDTH - paddle.width;
+    paddle.velocity = -Math.abs(paddle.velocity);
+    paddle.targetX = null;
+    paddle.wallDirection = 1;
+  }
+}
+
+function moveBall(ball) {
+  ball.x = ball.x + ball.vx;
+  ball.y = ball.y + ball.vy;
+}
+
+function updateAim(event) {
+  const bounds = canvas.getBoundingClientRect();
+  const pointerX = (event.clientX - bounds.left) * WIDTH / bounds.width;
+  aimAngle = Math.max(-0.85, Math.min(0.85, (pointerX - WIDTH / 2) / WIDTH * 1.7));
+}
+
+function launchBalls() {
+  if (viewMode !== "game" || gameMode !== "playing" || volleyActive || balls.length === 0) return;
+  let launchIndex = 0;
+  for (const ball of balls) {
+    if (ball.state !== "held") continue;
+    const launch = {
+      ball,
+      vx: Math.sin(aimAngle) * BALL_SPEED,
+      vy: -Math.cos(aimAngle) * BALL_SPEED
+    };
+    if (launchIndex === 0) {
+      ball.state = "active";
+      ball.vx = launch.vx;
+      ball.vy = launch.vy;
+    } else {
+      pendingBallLaunches.push({ ...launch, ticksRemaining: launchIndex * 8 });
+    }
+    launchIndex += 1;
+  }
+  volleyActive = true;
+}
+
+function finishVolley() {
+  volleyActive = false;
+  positionHeldBalls();
+  if (gameMode !== "playing") return;
+
+  clearCompletedRows();
+  dropBoardRows(Math.random() < 0.5 ? 1 : 2);
+  checkBottomRow();
+  awardBrainrotIncome();
+  if (gameMode !== "gameover") spawnFallingPiece();
+}
+
+function dropBoardRows(rowCount) {
+  const bricksThatHitBottom = bricks.filter((brick) => brick.y + rowCount * BRICK_HEIGHT >= BOARD_BOTTOM);
+  for (const brick of bricksThatHitBottom) stealBrainrots();
+  bricks = bricks.filter((brick) => !bricksThatHitBottom.includes(brick));
+  for (const brick of bricks) {
+    brick.y += rowCount * BRICK_HEIGHT;
+  }
+}
+
+function spawnFallingPiece() {
+  const shapeOrder = TETROMINO_SHAPES
+    .map((shape) => ({ shape, order: Math.random() }))
+    .sort((a, b) => a.order - b.order);
+
+  for (const { shape } of shapeOrder) {
+    const shapeWidth = Math.max(...shape.map(([col]) => col)) + 1;
+    const possibleColumns = Array.from(
+      { length: BRICK_COLUMNS - shapeWidth + 1 },
+      (_, column) => column
+    ).sort(() => Math.random() - 0.5);
+
+    for (const column of possibleColumns) {
+      const positions = shape.map(([col, row]) => ({
+        x: (column + col) * BRICK_WIDTH,
+        y: BOARD_TOP + row * BRICK_HEIGHT
+      }));
+      const overlaps = positions.some((position) => bricks.some((brick) =>
+        brick.x === position.x && brick.y === position.y
+      ));
+      if (overlaps) {
+        continue;
+      }
+
+      const minimumStrength = Math.min(5, 1 + Math.floor(GameState.Score / 300));
+      const effectIndex = Math.floor(Math.random() * positions.length);
+      const effects = ["ROW", "BALL"];
+      const effect = effects[Math.floor(Math.random() * effects.length)];
+      const cells = positions.map(({ x, y }, index) =>
+        createBrick(
+          x,
+          y,
+          minimumStrength + Math.floor(Math.random() * (minimumStrength + 1)),
+          index === effectIndex ? effect : null
+        )
+      );
+      bricks.push(...cells);
+      return true;
+    }
+  }
+
+  endGame("THE STACK REACHED THE TOP");
+  return false;
+}
+
+function clearCompletedRows() {
+  for (let row = BRICK_ROWS - 2; row >= 0; row--) {
+    const y = BOARD_TOP + row * BRICK_HEIGHT;
+    const occupiedColumns = new Set(
+      bricks.filter((brick) => brick.y === y).map((brick) => Math.round(brick.x / BRICK_WIDTH))
+    );
+    if (occupiedColumns.size !== BRICK_COLUMNS) {
+      continue;
+    }
+
+    bricks = bricks.filter((brick) => brick.y !== y);
+    for (const brick of bricks) {
+      if (brick.y < y) {
+        brick.y += BRICK_HEIGHT;
+      }
+    }
+    row += 1;
+  }
+}
+
+function checkBottomRow() {
+  const bottomY = BOARD_BOTTOM - BRICK_HEIGHT;
+  const occupiedColumns = new Set(
+    bricks.filter((brick) => brick.y === bottomY).map((brick) => Math.round(brick.x / BRICK_WIDTH))
+  );
+  if (occupiedColumns.size === BRICK_COLUMNS) dropBoardRows(1);
+}
+
+function rollBrainrotRarity() {
+  for (const rarity of brainrotRarities) {
+    if (Math.random() < rarity.chance) return rarity;
+  }
+  return brainrotRarities[brainrotRarities.length - 1];
+}
+
+function createBrainrot(rarityName) {
+  const rarity = brainrotRarities.find((item) => item.name === rarityName);
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    rarity: rarity.name,
+    name: rarity.brainrotName,
+    defaultName: rarity.brainrotName,
+    color: rarity.color,
+    income: rarity.income,
+    sale: rarity.sale,
+    storedCash: 0,
+    image: rarity.image
+  };
+}
+
+function spawnParticles(x, y, color, count = 12) {
+  if (!particleEffectsEnabled) return;
+  for (let index = 0; index < count; index++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      life: 24 + Math.random() * 18,
+      maxLife: 42,
+      color
+    });
+  }
+}
+
+function updateParticles() {
+  for (let index = particles.length - 1; index >= 0; index--) {
+    const particle = particles[index];
+    particle.x += particle.vx;
+    particle.y += particle.vy;
+    particle.vx *= 0.97;
+    particle.vy *= 0.97;
+    particle.life -= 1;
+    if (particle.life <= 0) particles.splice(index, 1);
+  }
+}
+
+function getBrainrotImage(source) {
+  if (!brainrotImageCache.has(source)) {
+    const image = new Image();
+    image.src = source;
+    brainrotImageCache.set(source, image);
+  }
+  return brainrotImageCache.get(source);
+}
+
+function spawnBrainrotDrop(rarityName, brick) {
+  fallingBrainrots.push({
+    brainrot: createBrainrot(rarityName),
+    x: brick.x + (brick.width - BRICK_WIDTH / 2) / 2,
+    y: brick.y + (brick.height - BRICK_WIDTH / 2) / 2,
+    width: BRICK_WIDTH / 2,
+    height: BRICK_WIDTH / 2,
+    velocityY: 0
+  });
+}
+
+function updateFallingBrainrots() {
+  for (let index = fallingBrainrots.length - 1; index >= 0; index--) {
+    const drop = fallingBrainrots[index];
+    drop.velocityY = Math.min(drop.velocityY + 0.12, 6);
+    drop.y += drop.velocityY;
+
+    if (boxesTouch(drop, paddle)) {
+      if (regularBrainrotCount() < factoryCapacity) {
+        brainrots.push(drop.brainrot);
+        spawnParticles(drop.x + drop.width / 2, drop.y + drop.height / 2, drop.brainrot.color, 18);
+        fallingBrainrots.splice(index, 1);
+        renderFactory();
+      }
+      continue;
+    }
+
+    if (drop.y > HEIGHT) fallingBrainrots.splice(index, 1);
+  }
+}
+
+function awardBrainrotIncome() {
+  const frenzyBoost = frenzyRoundsRemaining > 0 ? FRENZY_MULTIPLIER : 1;
+  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * rebirthMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER * frenzyBoost;
+  for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
+  if (frenzyRoundsRemaining > 0) {
+    frenzyRoundsRemaining -= 1;
+  }
+  const grid = document.getElementById("factory-grid");
+  if (!grid) return;
+  for (const bank of grid.querySelectorAll("[data-bank]")) {
+    const brainrot = brainrots.find((item) => item.id === bank.dataset.bank);
+    if (brainrot) bank.textContent = `$${Math.floor(brainrot.storedCash).toLocaleString()} stored`;
+  }
+  for (const button of grid.querySelectorAll("[data-claim]")) {
+    const brainrot = brainrots.find((item) => item.id === button.dataset.claim);
+    if (brainrot) button.setAttribute("aria-label", `Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.name}`);
+  }
+}
+
+function claimBrainrot(id) {
+  const brainrot = brainrots.find((item) => item.id === id);
+  if (!brainrot) return;
+  cashBalance += Math.floor(brainrot.storedCash);
+  brainrot.storedCash -= Math.floor(brainrot.storedCash);
+  renderFactory();
+}
+
+function brainrotSaleValue(brainrot) {
+  return Math.floor(brainrot.sale * SELL_VALUE_MULTIPLIER * rebirthMultiplier);
+}
+
+function sellBrainrot(id) {
+  const index = brainrots.findIndex((item) => item.id === id);
+  if (index < 0 || brainrots[index].special) return;  // Floppa is not for sale
+  cashBalance += brainrotSaleValue(brainrots[index]) + Math.floor(brainrots[index].storedCash);
+  brainrots.splice(index, 1);
+  renderFactory();
+}
+
+function sellAllBrainrots() {
+  const kept = [];
+  for (const brainrot of brainrots) {
+    if (brainrot.special) {
+      kept.push(brainrot);
+      continue;
+    }
+    cashBalance += brainrotSaleValue(brainrot) + Math.floor(brainrot.storedCash);
+  }
+  brainrots = kept;
+  renderFactory();
+}
+
+
+// ------------------------------------------------------------
+// FLOPPA, ASCENSION AND REBIRTH
+// Floppa is a special brainrot that is only sold in the shop. He lives in
+// the factory but takes no slot, cannot be sold or stolen, and has one
+// fixed picture. Owning all of him lets you ascend.
+// ------------------------------------------------------------
+function floppaCount() {
+  return brainrots.filter((brainrot) => brainrot.special).length;
+}
+
+function regularBrainrotCount() {
+  return brainrots.length - floppaCount();
+}
+
+function hasAllFloppa() {
+  return floppaCount() >= FLOPPA_CONFIG.costs.length;
+}
+
+function createFloppa() {
+  const floppa = FLOPPA_CONFIG;
+  return {
+    id: `floppa-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    rarity: "Floppa",
+    name: floppa.name,
+    defaultName: floppa.name,
+    color: floppa.color,
+    income: floppa.income,
+    sale: 0,
+    storedCash: 0,
+    image: floppa.image,
+    special: true
+  };
+}
+
+function addFloppa() {
+  brainrots.push(createFloppa());
+  spawnParticles(WIDTH / 2, HEIGHT / 2, FLOPPA_CONFIG.color, 40);
+  if (hasAllFloppa()) showAscension(true);
+}
+
+// Buying the 3rd Floppa plays the ascension cutscene, then the choice card appears.
+// Reopening it later from the shop skips straight to the choice.
+const ASCENSION_CUTSCENE_MS = 8200;   // keep in sync with the cutscene CSS timings
+const ASCENSION_SKIP_GRACE_MS = 600;  // ignore skips right after it starts (double-clicks, key repeat)
+let ascensionPhase = "choice";        // "cutscene" while it plays, then "choice"
+let ascensionTimer = null;
+let ascensionStartedAt = 0;
+
+function buildCutsceneSparks() {
+  const box = document.getElementById("cutscene-sparks");
+  if (!box || box.childElementCount > 0) return;
+  for (let index = 0; index < 28; index++) {
+    const spark = document.createElement("span");
+    spark.style.setProperty("--x", `${(Math.random() * 100).toFixed(1)}%`);
+    spark.style.setProperty("--delay", `${(Math.random() * 6).toFixed(2)}s`);
+    spark.style.setProperty("--dur", `${(2.5 + Math.random() * 3).toFixed(2)}s`);
+    spark.style.setProperty("--size", `${(3 + Math.random() * 6).toFixed(1)}px`);
+    box.append(spark);
+  }
+}
+
+function showAscension(playCutscene = false) {
+  if (!hasAllFloppa()) return;
+  viewMode = "ascension";
+  document.getElementById("shop-backdrop").hidden = true;
+  clearTimeout(ascensionTimer);
+  // Players who ask for reduced motion go straight to the choice.
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (playCutscene && !reducedMotion) {
+    buildCutsceneSparks();
+    ascensionPhase = "cutscene";
+    ascensionStartedAt = performance.now();
+    ascensionTimer = setTimeout(endAscensionCutscene, ASCENSION_CUTSCENE_MS);
+  } else {
+    ascensionPhase = "choice";
+  }
+  renderMenu();
+}
+
+function endAscensionCutscene() {
+  clearTimeout(ascensionTimer);
+  if (viewMode !== "ascension" || ascensionPhase !== "cutscene") return;
+  ascensionPhase = "choice";
+  renderMenu();
+}
+
+function skipAscensionCutscene() {
+  if (ascensionPhase !== "cutscene") return;
+  if (performance.now() - ascensionStartedAt < ASCENSION_SKIP_GRACE_MS) return;
+  endAscensionCutscene();
+}
+
+function stayInBrickrot() {
+  clearTimeout(ascensionTimer);
+  ascensionPhase = "choice";
+  viewMode = "game";
+  renderMenu();
+  renderFactory();
+}
+
+function goBackToRealWorld() {
+  if (!hasAllFloppa()) {
+    stayInBrickrot();
+    return;
+  }
+  clearTimeout(ascensionTimer);
+  ascensionPhase = "choice";
+  rebirth();
+  viewMode = "game";
+  renderMenu();
+  renderFactory();
+}
+
+// Starts a fresh run with a permanent cash boost. The 3 Floppa are spent on the trip home.
+function rebirth() {
+  rebirthCount += 1;
+  rebirthMultiplier = 1 + FLOPPA_CONFIG.rebirthBoost * rebirthCount;
+
+  cashBalance = 0;
+  brainrots = [];
+  fallingBrainrots = [];
+  bricks = [];
+  particles.length = 0;
+  GameState.Score = 0;
+  gameMode = "playing";
+  gameOverReason = "";
+  frenzyRoundsRemaining = 0;
+
+  factoryCapacity = START_FACTORY_CAPACITY;
+  factoryFloors = 1;
+  factoryMultiplier = 1;
+  brainrotIncomeMultiplier = 1;
+  brainrotDropMultiplier = 1;
+  permanentBallCount = 1;
+  for (const upgrade of upgrades) upgrade.purchases = 0;
+
+  paddle.width = PADDLE_START_WIDTH;
+  paddle.x = WIDTH / 2 - PADDLE_START_WIDTH / 2;
+  paddle.velocity = 0;
+  paddle.targetX = null;
+  paddle.wallDirection = 0;
+
+  resetBalls();
+  spawnFallingPiece();
+}
+
+function renderFactory() {
+  const grid = document.getElementById("factory-grid");
+  if (!grid) return;
+  document.getElementById("cash-balance").textContent = `$${Math.floor(cashBalance).toLocaleString()}`;
+  document.getElementById("factory-count").textContent = `${regularBrainrotCount()}/${factoryCapacity}`;
+  document.getElementById("factory-floors").textContent = `${factoryFloors} FLOOR${factoryFloors === 1 ? "" : "S"}`;
+  document.getElementById("factory-multiplier").textContent = `${factoryMultiplier.toFixed(2)}x FACTORY${rebirthCount ? ` · ${rebirthMultiplier.toFixed(2)}x REBIRTH` : ""}`;
+  document.getElementById("sell-all").disabled = regularBrainrotCount() === 0;
+  grid.replaceChildren();
+  // Floppa goes first in the grid.
+  const orderedBrainrots = [...brainrots].sort((a, b) => Number(Boolean(b.special)) - Number(Boolean(a.special)));
+  for (const brainrot of orderedBrainrots) {
+    const card = document.createElement("article");
+    card.className = "brainrot";
+    card.style.setProperty("--rarity", brainrot.color);
+    const image = document.createElement("img");
+    image.src = brainrot.image;
+    image.alt = brainrot.name;
+
+    const details = document.createElement("div");
+    details.className = "brainrot-details";
+    const rarity = document.createElement("strong");
+    rarity.className = "brainrot-rarity";
+    rarity.textContent = brainrot.rarity;
+    const name = document.createElement("input");
+    name.className = "brainrot-name";
+    name.type = "text";
+    name.value = brainrot.name;
+    name.maxLength = 40;
+    name.dataset.name = brainrot.id;
+    name.setAttribute("aria-label", `Name for ${brainrot.rarity} brainrot`);
+    const bank = document.createElement("span");
+    bank.className = "brainrot-bank";
+    bank.dataset.bank = brainrot.id;
+    bank.textContent = `$${Math.floor(brainrot.storedCash).toLocaleString()} stored`;
+    details.append(rarity, name, bank);
+
+    const actions = document.createElement("div");
+    actions.className = "brainrot-actions";
+
+    const collect = document.createElement("button");
+    collect.dataset.claim = brainrot.id;
+    collect.setAttribute("aria-label", `Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.name}`);
+    collect.textContent = "COLLECT";
+
+    if (brainrot.special) {
+      // Floppa keeps his own picture and can't be sold: collect only.
+      actions.append(collect);
+    } else {
+      const imagePicker = document.createElement("label");
+      imagePicker.className = "brainrot-image-picker";
+      imagePicker.append(document.createTextNode("SET IMAGE"));
+      const imageInput = document.createElement("input");
+      imageInput.type = "file";
+      imageInput.accept = "image/*";
+      imageInput.dataset.image = brainrot.id;
+      imageInput.setAttribute("aria-label", `Choose an image for ${brainrot.name}`);
+      imagePicker.append(imageInput);
+
+      const sell = document.createElement("button");
+      sell.dataset.sell = brainrot.id;
+      sell.title = "Sell brainrot";
+      sell.textContent = `Sell $${brainrotSaleValue(brainrot)}`;
+      actions.append(imagePicker, collect, sell);
+    }
+    card.append(image, details, actions);
+    grid.append(card);
+  }
+  renderShop();
+}
+
+function renderShop() {
+  const list = document.getElementById("upgrade-list");
+  if (!list) return;
+  document.getElementById("shop-cash").textContent = `$${Math.floor(cashBalance).toLocaleString()}`;
+  list.replaceChildren();
+  if (hasAllFloppa()) {
+    const boost = Math.round(FLOPPA_CONFIG.rebirthBoost * 100);
+    const ascend = document.createElement("article");
+    ascend.className = "upgrade-row ascend-row";
+    ascend.innerHTML = `<div><strong>Go back to the real world</strong><p>You hold all ${FLOPPA_CONFIG.costs.length} Floppa. Rebirth to restart with a permanent +${boost}% cash boost. Your Floppa come home with you.</p></div><button>ASCEND</button>`;
+    list.append(ascend);
+  }
+  for (const upgrade of upgrades) {
+    const purchases = upgrade.purchases || 0;
+    const soldOut = upgrade.maxPurchases && purchases >= upgrade.maxPurchases;
+    const cost = upgradeCost(upgrade);
+    const item = document.createElement("article");
+    item.className = "upgrade-row";
+    item.innerHTML = `<div><strong>${upgrade.name}</strong><p>${upgrade.description}</p><small>${purchases ? `OWNED ${purchases}${upgrade.maxPurchases ? `/${upgrade.maxPurchases}` : ""}` : "AVAILABLE"}</small></div><button ${soldOut ? "disabled" : ""}>$${cost.toLocaleString()}</button>`;
+    item.querySelector("button").addEventListener("click", () => buyUpgrade(upgrade.id));
+    list.append(item);
+  }
+}
+
+function stealBrainrots() {
+  // Floppa can't be stolen, so only regular brainrots are at risk.
+  const stolenCount = Math.ceil(regularBrainrotCount() * 0.25);
+  for (let count = 0; count < stolenCount; count++) {
+    const candidates = brainrots.filter((brainrot) => !brainrot.special);
+    if (candidates.length === 0) break;
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    brainrots.splice(brainrots.indexOf(target), 1);
+  }
+  renderFactory();
+}
+
+function upgradeCost(upgrade) {
+  const purchases = upgrade.purchases || 0;
+  if (upgrade.costs) return upgrade.costs[Math.min(purchases, upgrade.costs.length - 1)];
+  return Math.floor(upgrade.cost * Math.pow(1.55, purchases));
+}
+
+function buyUpgrade(id) {
+  const upgrade = upgrades.find((item) => item.id === id);
+  if (!upgrade || (upgrade.maxPurchases && (upgrade.purchases || 0) >= upgrade.maxPurchases)) return;
+  const cost = upgradeCost(upgrade);
+  if (cashBalance < cost) return;
+  cashBalance -= cost;
+  upgrade.purchases = (upgrade.purchases || 0) + 1;
+  upgrade.apply();
+  renderShop();
+  renderFactory();
+}
+
+function endGame(reason) {
+  gameMode = "gameover";
+  gameOverReason = reason;
+}
+
+function showTitleScreen() {
+  viewMode = "title";
+  document.getElementById("shop-backdrop").hidden = true;
+  renderMenu();
+}
+
+function showSettings() {
+  viewMode = "settings";
+  document.getElementById("shop-backdrop").hidden = true;
+  renderMenu();
+}
+
+function beginGame() {
+  gameStarted = true;
+  viewMode = "game";
+  renderMenu();
+}
+
+function renderMenu() {
+  const overlay = document.getElementById("title-screen");
+  if (!overlay) return;
+  overlay.hidden = viewMode === "game" || viewMode === "ascension";
+  document.getElementById("ascension-screen").hidden = viewMode !== "ascension";
+  document.getElementById("ascension-cutscene").hidden = viewMode !== "ascension" || ascensionPhase !== "cutscene";
+  document.getElementById("ascension-choice").hidden = viewMode !== "ascension" || ascensionPhase !== "choice";
+  document.getElementById("title-menu").hidden = viewMode !== "title";
+  document.getElementById("settings-menu").hidden = viewMode !== "settings";
+  document.getElementById("start-game").textContent = gameStarted ? "RESUME GAME" : "START GAME";
+  document.getElementById("title-menu-toggle").hidden = !gameStarted;
+  document.getElementById("particle-toggle").checked = particleEffectsEnabled;
+  document.getElementById("game-speed").value = String(gameSpeed);
+}
+
+
+// ------------------------------------------------------------
+// THE GAME LOOP
+// The browser calls frame() every time it is ready to draw. Updates
+// use fixed 60 Hz steps, with held Space feeding the simulation faster.
+// ------------------------------------------------------------
+const STEP = 1000 / 60;
+let lastTime = 0;
+let leftover = 0;
+
+function frame(now) {
+  const elapsed = Math.min(now - lastTime, 250);
+  if (viewMode === "game") {
+    leftover += elapsed * gameSpeed * (keys[" "] ? 4 : 1);
+  } else {
+    leftover = 0;
+  }
+  lastTime = now;
+
+  while (viewMode === "game" && leftover >= STEP) {
+    update();
+    leftover = leftover - STEP;
+  }
+
+  draw();
+  requestAnimationFrame(frame);
+}
+
+function start() {
+  resetBalls();
+  spawnFallingPiece();
+  renderShop();
+  renderFactory();
+  renderMenu();
+  lastTime = performance.now();
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener("load", start, { once: true });
+
