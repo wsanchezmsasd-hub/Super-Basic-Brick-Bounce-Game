@@ -12,8 +12,7 @@ const ctx = canvas.getContext("2d");
 const WIDTH = canvas.width;   // 600
 const HEIGHT = canvas.height; // 800
 
-const GameState = { Score: 0 };
-
+const GameState = GAME_CONFIG.singletons.runtime;
 
 // ------------------------------------------------------------
 // THE BALL
@@ -327,6 +326,39 @@ function dropBoardRows(rowCount) {
 }
 
 function spawnFallingPiece() {
+  if (Math.random() < 0.16) {
+    const size = Math.random() < 0.7 ? 2 : 3;
+    const x = Math.floor(Math.random() * (BRICK_COLUMNS - size)) * BRICK_WIDTH;
+    const y = BOARD_TOP;
+    const megaRect = { x, y, width: size * BRICK_WIDTH, height: size * BRICK_HEIGHT };
+    const overlaps = bricks.some((brick) => boxesTouch(megaRect, brick));
+    if (!overlaps) {
+      bricks.push(createBrick(x, y, 10 + size * 4, "MEGA", {
+        kind: "mega",
+        effect: "MEGA",
+        width: megaRect.width,
+        height: megaRect.height,
+        brainrotRarity: "Legendary"
+      }));
+      return true;
+    }
+  }
+
+  if (Math.random() < 0.18) {
+    const frenzyX = Math.floor(Math.random() * BRICK_COLUMNS) * BRICK_WIDTH;
+    const frenzyY = BOARD_TOP + Math.floor(Math.random() * (BRICK_ROWS / 2)) * BRICK_HEIGHT;
+    const frenzyRect = { x: frenzyX, y: frenzyY, width: BRICK_WIDTH, height: BRICK_HEIGHT };
+    const overlaps = bricks.some((brick) => boxesTouch(frenzyRect, brick));
+    if (!overlaps) {
+      bricks.push(createBrick(frenzyX, frenzyY, 2, "FRENZY", {
+        kind: "frenzy",
+        effect: "FRENZY",
+        brainrotRarity: null
+      }));
+      return true;
+    }
+  }
+
   const shapeOrder = TETROMINO_SHAPES
     .map((shape) => ({ shape, order: Math.random() }))
     .sort((a, b) => a.order - b.order);
@@ -352,7 +384,7 @@ function spawnFallingPiece() {
 
       const minimumStrength = Math.min(5, 1 + Math.floor(GameState.Score / 300));
       const effectIndex = Math.floor(Math.random() * positions.length);
-      const effects = ["ROW", "BALL"];
+      const effects = ["ROW", "BALL", "FRENZY"];
       const effect = effects[Math.floor(Math.random() * effects.length)];
       const cells = positions.map(({ x, y }, index) =>
         createBrick(
@@ -492,7 +524,13 @@ function updateFallingBrainrots() {
 }
 
 function awardBrainrotIncome() {
-  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER;
+  const economy = GAME_CONFIG.singletons.economy;
+  const frenzyMultiplier = economy.frenzyTurns > 0 ? 2 : 1;
+  if (economy.frenzyTurns > 0) {
+    economy.frenzyTurns = Math.max(0, economy.frenzyTurns - 1);
+  }
+
+  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER * frenzyMultiplier;
   for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
   const grid = document.getElementById("factory-grid");
   if (!grid) return;
