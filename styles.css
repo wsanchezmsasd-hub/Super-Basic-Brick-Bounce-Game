@@ -229,6 +229,18 @@ canvas {
 .upgrade-row p { margin: 4px 0; color: #c4ccdb; font: 12px/1.35 "Trebuchet MS", sans-serif; }
 .upgrade-row small { color: var(--pink); font: 900 9px "Trebuchet MS", sans-serif; letter-spacing: .6px; }
 .upgrade-row button { flex: 0 0 76px; }
+.brainrot-protected { align-self: center; color: var(--acid); font: 900 10px "Trebuchet MS", sans-serif; letter-spacing: .8px; }
+.floppa-ascension[hidden] { display: none; }
+.floppa-ascension { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(5, 2, 15, .9); animation: ascension-flash 500ms ease-out; }
+.floppa-cutscene { width: min(520px, 100%); padding: 30px; border: 4px solid var(--acid); background: #171126; box-shadow: 10px 10px 0 var(--pink), 0 0 70px rgba(255, 230, 74, .4); text-align: center; animation: floppa-rise 700ms cubic-bezier(.2, .8, .2, 1); }
+.floppa-cutscene img { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 0 22px var(--acid)); animation: floppa-float 1.8s ease-in-out infinite; }
+.floppa-cutscene h2 { color: var(--acid); font: 900 32px Impact, sans-serif; }
+.floppa-cutscene p:not(.eyebrow) { color: #e4dff2; font: 14px/1.5 "Trebuchet MS", sans-serif; }
+.floppa-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+.floppa-actions button:last-child { color: #fff; background: var(--pink); }
+@keyframes ascension-flash { from { background: rgba(255, 230, 74, .8); } to { background: rgba(5, 2, 15, .9); } }
+@keyframes floppa-rise { from { opacity: 0; transform: translateY(70px) scale(.8) rotate(-4deg); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0); } }
+@keyframes floppa-float { 50% { transform: translateY(-10px) rotate(3deg); } }
 
 .title-screen,
 .title-screen[hidden] {

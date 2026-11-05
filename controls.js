@@ -54,6 +54,8 @@ document.getElementById("shop-close").addEventListener("click", () => setShopOpe
 document.getElementById("shop-backdrop").addEventListener("click", (event) => {
   if (event.target.id === "shop-backdrop") setShopOpen(false);
 });
+document.getElementById("floppa-stay").addEventListener("click", closeFloppaAscension);
+document.getElementById("floppa-rebirth").addEventListener("click", rebirthFromFloppa);
 document.getElementById("sell-all").addEventListener("click", sellAllBrainrots);
 document.getElementById("factory-grid").addEventListener("click", (event) => {
   const claimButton = event.target.closest("[data-claim]");

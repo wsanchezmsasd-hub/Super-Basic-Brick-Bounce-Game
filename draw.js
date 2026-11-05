@@ -97,6 +97,10 @@ function drawHud() {
   ctx.fillText(`BRAINROTS ${brainrots.length}/${factoryCapacity}`, 12, 24);
   ctx.fillStyle = "#42f2df";
   ctx.fillText(`BALLS ${balls.length}`, 12, 47);
+  if (frenzyTicksRemaining > 0) {
+    ctx.fillStyle = "#ff9b32";
+    ctx.fillText(`FRENZY 1.5x ${Math.ceil(frenzyTicksRemaining / 60)}s`, 12, 70);
+  }
   ctx.textAlign = "right";
   ctx.fillStyle = "#ff64bb";
   ctx.fillText(`SCORE ${GameState.Score}`, WIDTH - 12, 24);

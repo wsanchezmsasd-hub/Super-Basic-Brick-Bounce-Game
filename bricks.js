@@ -19,14 +19,14 @@ const TETROMINO_SHAPES = [
   [[2, 0], [0, 1], [1, 1], [2, 1]]
 ];
 
-function createBrick(x, y, hitsRequired = 1, effect = null) {
+function createBrick(x, y, hitsRequired = 1, effect = null, width = BRICK_WIDTH, height = BRICK_HEIGHT, forcedBrainrotRarity = null) {
   const dropChance = Math.min(0.98, GAME_CONFIG.brainrots.dropChance * brainrotDropMultiplier);
-  const brainrotRarity = Math.random() < dropChance ? rollBrainrotRarity().name : null;
+  const brainrotRarity = forcedBrainrotRarity || (Math.random() < dropChance ? rollBrainrotRarity().name : null);
   return {
     x,
     y,
-    width: BRICK_WIDTH,
-    height: BRICK_HEIGHT,
+    width,
+    height,
     hitsRequired,
     hitsRemaining: hitsRequired,
     effect,
@@ -45,6 +45,15 @@ function drawBricks() {
     ctx.fillStyle = gradient;
     ctx.fillRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
     ctx.shadowBlur = 0;
+    if (brick.effect === "PULL") {
+      ctx.beginPath();
+      ctx.fillStyle = "#09070d";
+      ctx.arc(brick.x + brick.width / 2, brick.y + brick.height / 2, brick.height * 0.27, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ffe64a";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
     ctx.strokeStyle = "rgba(255,255,255,.8)";
     ctx.lineWidth = 2;
     ctx.strokeRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);

@@ -53,6 +53,28 @@ function bounceOffPaddle(ball) {
   }
 }
 
+const PULL_RADIUS = BRICK_WIDTH * 4;
+const PULL_FORCE = 0.018;
+
+function applyPullForces(ball) {
+  for (const brick of bricks) {
+    if (brick.effect !== "PULL") continue;
+
+    const ballCenterX = ball.x + ball.width / 2;
+    const ballCenterY = ball.y + ball.height / 2;
+    const pullCenterX = brick.x + brick.width / 2;
+    const pullCenterY = brick.y + brick.height / 2;
+    const distanceX = pullCenterX - ballCenterX;
+    const distanceY = pullCenterY - ballCenterY;
+    const distance = Math.hypot(distanceX, distanceY);
+    if (distance === 0 || distance > PULL_RADIUS) continue;
+
+    const strength = PULL_FORCE * (1 - distance / PULL_RADIUS);
+    ball.vx += distanceX / distance * strength;
+    ball.vy += distanceY / distance * strength;
+  }
+}
+
 
 // The ball bounces off blocks and damages the one it hits.
 function bounceOffBricks(ball) {
@@ -93,16 +115,26 @@ function bounceOffBricks(ball) {
         for (const rowBrick of rowBricks) {
           if (rowBrick.brainrotRarity) spawnBrainrotDrop(rowBrick.brainrotRarity, rowBrick);
         }
-        GameState.Score += rowBricks.length * 10;
+        addScore(rowBricks.length * 10);
         bricks = bricks.filter((candidate) => candidate.y !== brick.y);
+      } else if (brick.effect === "WARP") {
+        const rowBricks = bricks.filter((candidate) => candidate.y === brick.y);
+        for (const rowBrick of rowBricks) {
+          const column = Math.round(rowBrick.x / BRICK_WIDTH);
+          const columnSpan = Math.ceil(rowBrick.width / BRICK_WIDTH);
+          const nextColumn = column + 1 + columnSpan > BRICK_COLUMNS ? 0 : column + 1;
+          rowBrick.x = nextColumn * BRICK_WIDTH;
+        }
+        addScore(10);
       } else {
         if (brick.brainrotRarity) spawnBrainrotDrop(brick.brainrotRarity, brick);
-        GameState.Score += 10;
+        addScore(10);
         bricks.splice(index, 1);
       }
       if (brick.effect === "BALL") {
         scheduleExtraBall(ball.x, ball.y, -ball.vx, ball.vy);
       }
+      if (brick.effect === "FRENZY") frenzyTicksRemaining = FRENZY_DURATION_TICKS;
     }
 
     break;  // bounce off one brick per update, then stop looking

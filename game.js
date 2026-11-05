@@ -75,7 +75,12 @@ let factoryCapacity = 8;
 let factoryFloors = 1;
 let factoryMultiplier = 1;
 let brainrotIncomeMultiplier = 1;
+let rebirthCount = 0;
+let passiveMoneyMultiplier = 1;
 let brainrotDropMultiplier = 1;
+let frenzyTicksRemaining = 0;
+const FRENZY_DURATION_TICKS = 15 * 60;
+const FRENZY_SCORE_MULTIPLIER = 1.5;
 const brainrotImageCache = new Map();
 const particles = [];
 const SELL_VALUE_MULTIPLIER = 21;
@@ -89,6 +94,30 @@ let gameMode = "playing";
 let gameOverReason = "";
 
 const upgrades = [
+  {
+    id: "floppa",
+    name: "FLOPPA",
+    description: "$2,500 passive income. Protected from selling and stealing.",
+    cost: 50000,
+    costs: [50000, 100000, 150000],
+    maxPurchases: 3,
+    apply() {
+      brainrots.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        rarity: "FLOPPA",
+        name: "FLOPPA",
+        defaultName: "FLOPPA",
+        color: "#ff9b32",
+        income: 2500,
+        sale: 0,
+        storedCash: 0,
+        image: "Floppa.png",
+        protected: true
+      });
+      renderFactory();
+      if (this.purchases === this.maxPurchases) showFloppaAscension();
+    }
+  },
   {
     id: "floor2",
     name: "Factory: Floor 2",
@@ -185,6 +214,8 @@ function update() {
   movePaddle();
   updateParticles();
 
+  if (frenzyTicksRemaining > 0) frenzyTicksRemaining -= 1;
+
   if (gameMode === "gameover") {
     return;
   }
@@ -199,6 +230,7 @@ function update() {
   for (let index = balls.length - 1; index >= 0; index--) {
     const ball = balls[index];
     if (ball.state !== "active") continue;
+    applyPullForces(ball);
     moveBall(ball);
     bounceOffWalls(ball);
     bounceOffPaddle(ball);
@@ -352,9 +384,9 @@ function spawnFallingPiece() {
 
       const minimumStrength = Math.min(5, 1 + Math.floor(GameState.Score / 300));
       const effectIndex = Math.floor(Math.random() * positions.length);
-      const effects = ["ROW", "BALL"];
+      const effects = ["ROW", "BALL", "WARP", "FRENZY", "PULL", "MEGA"];
       const effect = effects[Math.floor(Math.random() * effects.length)];
-      const cells = positions.map(({ x, y }, index) =>
+      let cells = positions.map(({ x, y }, index) =>
         createBrick(
           x,
           y,
@@ -362,6 +394,46 @@ function spawnFallingPiece() {
           index === effectIndex ? effect : null
         )
       );
+      if (effect === "MEGA") {
+        const megaPosition = positions[effectIndex];
+        const megaColumn = Math.min(BRICK_COLUMNS - 2, Math.round(megaPosition.x / BRICK_WIDTH));
+        const megaRow = Math.round((megaPosition.y - BOARD_TOP) / BRICK_HEIGHT);
+        const megaCoordinates = [
+          [megaColumn, megaRow],
+          [megaColumn + 1, megaRow],
+          [megaColumn, megaRow + 1],
+          [megaColumn + 1, megaRow + 1]
+        ];
+        const megaOverlapsExisting = megaCoordinates.some(([column, row]) => bricks.some((brick) =>
+          brick.x === column * BRICK_WIDTH && brick.y === BOARD_TOP + row * BRICK_HEIGHT
+        ));
+        if (megaRow < BRICK_ROWS - 1 && !megaOverlapsExisting) {
+          const megaCells = new Set([
+            `${megaColumn},${megaRow}`,
+            `${megaColumn + 1},${megaRow}`,
+            `${megaColumn},${megaRow + 1}`,
+            `${megaColumn + 1},${megaRow + 1}`
+          ]);
+          cells = cells.filter((cell) => !megaCells.has(
+            `${Math.round(cell.x / BRICK_WIDTH)},${Math.round((cell.y - BOARD_TOP) / BRICK_HEIGHT)}`
+          ));
+          cells.push(createBrick(
+            megaColumn * BRICK_WIDTH,
+            megaPosition.y,
+            minimumStrength * 2,
+            "MEGA",
+            BRICK_WIDTH * 2,
+            BRICK_HEIGHT * 2,
+            rollGoodBrainrotRarity().name
+          ));
+        } else {
+          cells[effectIndex] = createBrick(
+            megaPosition.x,
+            megaPosition.y,
+            minimumStrength + Math.floor(Math.random() * (minimumStrength + 1))
+          );
+        }
+      }
       bricks.push(...cells);
       return true;
     }
@@ -404,6 +476,16 @@ function rollBrainrotRarity() {
     if (Math.random() < rarity.chance) return rarity;
   }
   return brainrotRarities[brainrotRarities.length - 1];
+}
+
+function rollGoodBrainrotRarity() {
+  const goodRarities = brainrotRarities.slice(0, 4);
+  return goodRarities[Math.floor(Math.random() * goodRarities.length)];
+}
+
+function addScore(points) {
+  const multiplier = frenzyTicksRemaining > 0 ? FRENZY_SCORE_MULTIPLIER : 1;
+  GameState.Score += Math.round(points * multiplier);
 }
 
 function createBrainrot(rarityName) {
@@ -492,7 +574,7 @@ function updateFallingBrainrots() {
 }
 
 function awardBrainrotIncome() {
-  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER;
+  const multiplier = factoryMultiplier * brainrotIncomeMultiplier * passiveMoneyMultiplier * BRAINROT_INCOME_EVENT_MULTIPLIER;
   for (const brainrot of brainrots) brainrot.storedCash += brainrot.income * multiplier;
   const grid = document.getElementById("factory-grid");
   if (!grid) return;
@@ -517,14 +599,17 @@ function claimBrainrot(id) {
 function sellBrainrot(id) {
   const index = brainrots.findIndex((item) => item.id === id);
   if (index < 0) return;
+  if (brainrots[index].protected) return;
   cashBalance += brainrots[index].sale * SELL_VALUE_MULTIPLIER + Math.floor(brainrots[index].storedCash);
   brainrots.splice(index, 1);
   renderFactory();
 }
 
 function sellAllBrainrots() {
-  for (const brainrot of brainrots) cashBalance += brainrot.sale * SELL_VALUE_MULTIPLIER + Math.floor(brainrot.storedCash);
-  brainrots = [];
+  for (const brainrot of brainrots) {
+    if (!brainrot.protected) cashBalance += brainrot.sale * SELL_VALUE_MULTIPLIER + Math.floor(brainrot.storedCash);
+  }
+  brainrots = brainrots.filter((brainrot) => brainrot.protected);
   renderFactory();
 }
 
@@ -535,7 +620,7 @@ function renderFactory() {
   document.getElementById("factory-count").textContent = `${brainrots.length}/${factoryCapacity}`;
   document.getElementById("factory-floors").textContent = `${factoryFloors} FLOOR${factoryFloors === 1 ? "" : "S"}`;
   document.getElementById("factory-multiplier").textContent = `${factoryMultiplier.toFixed(2)}x FACTORY`;
-  document.getElementById("sell-all").disabled = brainrots.length === 0;
+  document.getElementById("sell-all").disabled = brainrots.every((brainrot) => brainrot.protected);
   grid.replaceChildren();
   for (const brainrot of brainrots) {
     const card = document.createElement("article");
@@ -579,11 +664,18 @@ function renderFactory() {
     collect.dataset.claim = brainrot.id;
     collect.setAttribute("aria-label", `Collect $${Math.floor(brainrot.storedCash)} from ${brainrot.name}`);
     collect.textContent = "COLLECT";
-    const sell = document.createElement("button");
-    sell.dataset.sell = brainrot.id;
-    sell.title = "Sell brainrot";
-    sell.textContent = `Sell $${brainrot.sale * SELL_VALUE_MULTIPLIER}`;
-    actions.append(imagePicker, collect, sell);
+    if (!brainrot.protected) {
+      const sell = document.createElement("button");
+      sell.dataset.sell = brainrot.id;
+      sell.title = "Sell brainrot";
+      sell.textContent = `Sell $${brainrot.sale * SELL_VALUE_MULTIPLIER}`;
+      actions.append(imagePicker, collect, sell);
+    } else {
+      const protectedLabel = document.createElement("span");
+      protectedLabel.className = "brainrot-protected";
+      protectedLabel.textContent = "PROTECTED";
+      actions.append(imagePicker, collect, protectedLabel);
+    }
     card.append(image, details, actions);
     grid.append(card);
   }
@@ -613,16 +705,18 @@ function renderShop() {
 }
 
 function stealBrainrots() {
-  const stolenCount = Math.ceil(brainrots.length * 0.25);
+  const stealableBrainrots = brainrots.filter((brainrot) => !brainrot.protected);
+  const stolenCount = Math.ceil(stealableBrainrots.length * 0.25);
   for (let count = 0; count < stolenCount; count++) {
-    if (brainrots.length === 0) break;
-    const index = Math.floor(Math.random() * brainrots.length);
-    brainrots.splice(index, 1);
+    if (stealableBrainrots.length === 0) break;
+    const stolenBrainrot = stealableBrainrots.splice(Math.floor(Math.random() * stealableBrainrots.length), 1)[0];
+    brainrots.splice(brainrots.indexOf(stolenBrainrot), 1);
   }
   renderFactory();
 }
 
 function upgradeCost(upgrade) {
+  if (upgrade.costs) return upgrade.costs[upgrade.purchases || 0];
   return Math.floor(upgrade.cost * Math.pow(1.55, upgrade.purchases || 0));
 }
 
@@ -636,6 +730,27 @@ function buyUpgrade(id) {
   upgrade.apply();
   renderShop();
   renderFactory();
+}
+
+function showFloppaAscension() {
+  document.getElementById("floppa-ascension").hidden = false;
+  document.getElementById("floppa-cutscene").classList.remove("cutscene-finished");
+}
+
+function closeFloppaAscension() {
+  document.getElementById("floppa-ascension").hidden = true;
+  document.getElementById("floppa-cutscene").classList.add("cutscene-finished");
+}
+
+function rebirthFromFloppa() {
+  rebirthCount += 1;
+  passiveMoneyMultiplier *= 2;
+  cashBalance = 0;
+  brainrots = [];
+  for (const upgrade of upgrades) upgrade.purchases = 0;
+  renderFactory();
+  renderShop();
+  closeFloppaAscension();
 }
 
 function endGame(reason) {
