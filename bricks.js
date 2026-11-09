@@ -30,21 +30,32 @@ function createBrick(x, y, hitsRequired = 1, effect = null, width = BRICK_WIDTH,
     hitsRequired,
     hitsRemaining: hitsRequired,
     effect,
-    brainrotRarity
+    brainrotRarity,
+    adachiRei: Math.random() < GAME_CONFIG.adachiRei.replacementChance
   };
 }
 
 function drawBricks() {
   for (const brick of bricks) {
     const hue = (brick.x * 0.34 + brick.y * 0.18 + performance.now() / 32) % 360;
-    const gradient = ctx.createLinearGradient(brick.x, brick.y, brick.x + brick.width, brick.y + brick.height);
-    gradient.addColorStop(0, `hsl(${hue}, 100%, 62%)`);
-    gradient.addColorStop(1, `hsl(${(hue + 62) % 360}, 100%, 48%)`);
-    ctx.shadowColor = `hsl(${hue}, 100%, 58%)`;
-    ctx.shadowBlur = 13;
-    ctx.fillStyle = gradient;
-    ctx.fillRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
-    ctx.shadowBlur = 0;
+    if (brick.adachiRei) {
+      const image = getBrainrotImage("AdachiRei.png");
+      if (image.complete && image.naturalWidth > 0) {
+        ctx.drawImage(image, brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
+      } else {
+        ctx.fillStyle = `hsl(${hue}, 100%, 55%)`;
+        ctx.fillRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
+      }
+    } else {
+      const gradient = ctx.createLinearGradient(brick.x, brick.y, brick.x + brick.width, brick.y + brick.height);
+      gradient.addColorStop(0, `hsl(${hue}, 100%, 62%)`);
+      gradient.addColorStop(1, `hsl(${(hue + 62) % 360}, 100%, 48%)`);
+      ctx.shadowColor = `hsl(${hue}, 100%, 58%)`;
+      ctx.shadowBlur = 13;
+      ctx.fillStyle = gradient;
+      ctx.fillRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
+      ctx.shadowBlur = 0;
+    }
     if (brick.effect === "PULL") {
       ctx.beginPath();
       ctx.fillStyle = "#09070d";
@@ -65,12 +76,14 @@ function drawBricks() {
       ctx.font = "900 9px Impact, sans-serif";
       ctx.fillText(brick.brainrotRarity.toUpperCase(), brick.x + brick.width / 2, brick.y + 5, brick.width - 6);
     }
-    ctx.fillStyle = "#10121a";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 12px Impact, sans-serif";
-    const label = brick.effect || (brick.hitsRequired > 1 ? `x${brick.hitsRemaining}` : "BLOCK");
-    ctx.fillText(label, brick.x + brick.width / 2, brick.y + brick.height / 2, brick.width - 4);
+    if (!brick.adachiRei) {
+      ctx.fillStyle = "#10121a";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "900 12px Impact, sans-serif";
+      const label = brick.effect || (brick.hitsRequired > 1 ? `x${brick.hitsRemaining}` : "BLOCK");
+      ctx.fillText(label, brick.x + brick.width / 2, brick.y + brick.height / 2, brick.width - 4);
+    }
   }
   drawFallingBrainrots();
   ctx.textAlign = "left";

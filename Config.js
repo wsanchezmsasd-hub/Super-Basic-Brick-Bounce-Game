@@ -4,5 +4,8 @@ const GAME_CONFIG = {
   },
   brainrots: {
     dropChance: 0.7
+  },
+  adachiRei: {
+    replacementChance: 0.05
   }
 };
