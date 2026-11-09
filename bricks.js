@@ -39,11 +39,11 @@ function drawBricks() {
   for (const brick of bricks) {
     const hue = (brick.x * 0.34 + brick.y * 0.18 + performance.now() / 32) % 360;
     if (brick.adachiRei) {
-      const image = getBrainrotImage("AdachiRei.png");
+      const image = getBrainrotImage("Miku.jpg");
       if (image.complete && image.naturalWidth > 0) {
         ctx.drawImage(image, brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
       } else {
-        ctx.fillStyle = `hsl(${hue}, 100%, 55%)`;
+        ctx.fillStyle = "#f2f2f2";
         ctx.fillRect(brick.x + 2, brick.y + 2, brick.width - 4, brick.height - 4);
       }
     } else {
