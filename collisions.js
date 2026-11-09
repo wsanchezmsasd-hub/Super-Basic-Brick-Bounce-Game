@@ -75,6 +75,33 @@ function applyPullForces(ball) {
   }
 }
 
+function spawnBrickBrainrotDrop(brick) {
+  if (brick.adachiRei) {
+    const brainrot = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      rarity: "SPECIAL",
+      name: "Hatsune miku Plush",
+      defaultName: "Hatsune miku Plush",
+      color: "#46c7f2",
+      income: 500 / BRAINROT_INCOME_EVENT_MULTIPLIER,
+      sale: 4500 / SELL_VALUE_MULTIPLIER,
+      storedCash: 0,
+      image: "Miku.jpg"
+    };
+    fallingBrainrots.push({
+      brainrot,
+      x: brick.x + (brick.width - BRICK_WIDTH / 2) / 2,
+      y: brick.y + (brick.height - BRICK_WIDTH / 2) / 2,
+      width: BRICK_WIDTH / 2,
+      height: BRICK_WIDTH / 2,
+      velocityY: 0
+    });
+    return;
+  }
+
+  if (brick.brainrotRarity) spawnBrainrotDrop(brick.brainrotRarity, brick);
+}
+
 
 // The ball bounces off blocks and damages the one it hits.
 function bounceOffBricks(ball) {
@@ -113,7 +140,7 @@ function bounceOffBricks(ball) {
       if (brick.effect === "ROW") {
         const rowBricks = bricks.filter((candidate) => candidate.y === brick.y);
         for (const rowBrick of rowBricks) {
-          if (rowBrick.brainrotRarity) spawnBrainrotDrop(rowBrick.brainrotRarity, rowBrick);
+          spawnBrickBrainrotDrop(rowBrick);
         }
         addScore(rowBricks.length * 10);
         bricks = bricks.filter((candidate) => candidate.y !== brick.y);
@@ -127,7 +154,7 @@ function bounceOffBricks(ball) {
         }
         addScore(10);
       } else {
-        if (brick.brainrotRarity) spawnBrainrotDrop(brick.brainrotRarity, brick);
+        spawnBrickBrainrotDrop(brick);
         addScore(10);
         bricks.splice(index, 1);
       }
