@@ -14,7 +14,6 @@ const HEIGHT = canvas.height; // 800
 
 const GameState = { Score: 0 };
 
-
 // ------------------------------------------------------------
 // THE BALL
 // x and y are the top-left corner. vx and vy are how many pixels
@@ -47,7 +46,6 @@ function positionHeldBalls() {
   }
 }
 
-
 // ------------------------------------------------------------
 // THE PADDLE
 // ------------------------------------------------------------
@@ -61,7 +59,6 @@ const paddle = {
   targetX: null,
   wallDirection: 0
 };
-
 
 // ------------------------------------------------------------
 // FALLING TETRIS PIECES
@@ -92,6 +89,18 @@ let particleEffectsEnabled = true;
 let gameSpeed = 1;
 let gameMode = "playing";
 let gameOverReason = "";
+
+const BRAINROT_PARTICLE_SOURCES = [
+  "common.png",
+  "uncommon.png",
+  "rare.png",
+  "legendary.png",
+  "mythical.png",
+  "brainrotgod.png",
+  "Floppa.png",
+  "AdachiRei.png",
+  "Miku.jpg"
+];
 
 const upgrades = [
   {
@@ -203,7 +212,6 @@ const brainrotRarities = [
   { name: "Uncommon", brainrotName: "lirili larila", image: "uncommon.png", chance: 1 / 4, color: "#76ed5a", income: 0.55, sale: 4 },
   { name: "Common", brainrotName: "Tung Tung Tung sahur", image: "common.png", chance: 1 / 2, color: "#aeb6c2", income: 0.2, sale: 2 }
 ];
-
 
 // ------------------------------------------------------------
 // UPDATE: runs 60 times every second. Move things, then check
@@ -503,20 +511,34 @@ function createBrainrot(rarityName) {
   };
 }
 
-function spawnParticles(x, y, color, count = 12) {
+function randomBrainrotParticleSource() {
+  return BRAINROT_PARTICLE_SOURCES[Math.floor(Math.random() * BRAINROT_PARTICLE_SOURCES.length)];
+}
+
+function spawnParticles(x, y, color, count = 12, options = {}) {
   if (!particleEffectsEnabled) return;
-  for (let index = 0; index < count; index++) {
+
+  const particleCount = Math.max(8, count);
+  const particleLife = options.life ?? 28;
+  const gravity = options.gravity ?? 0.14;
+
+  for (let index = 0; index < particleCount; index++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 1 + Math.random() * 4;
+    const baseSpeed = options.speed ?? (2 + Math.random() * 5);
+    const imageSource = options.image ?? randomBrainrotParticleSource();
+
     particles.push({
       x,
       y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      size: 2 + Math.random() * 4,
-      life: 24 + Math.random() * 18,
-      maxLife: 42,
-      color
+      vx: Math.cos(angle) * baseSpeed,
+      vy: Math.sin(angle) * baseSpeed - (Math.random() * 2.2),
+      image: imageSource,
+      color,
+      gravity,
+      life: particleLife + Math.random() * 18,
+      maxLife: particleLife + 18,
+      size: options.size ?? (2 + Math.random() * 5),
+      sprite: options.sprite ?? null
     });
   }
 }
@@ -526,8 +548,9 @@ function updateParticles() {
     const particle = particles[index];
     particle.x += particle.vx;
     particle.y += particle.vy;
-    particle.vx *= 0.97;
-    particle.vy *= 0.97;
+    particle.vy += particle.gravity;
+    particle.vx *= 0.985;
+    particle.vy *= 0.985;
     particle.life -= 1;
     if (particle.life <= 0) particles.splice(index, 1);
   }
@@ -562,7 +585,11 @@ function updateFallingBrainrots() {
     if (boxesTouch(drop, paddle)) {
       if (brainrots.length < factoryCapacity) {
         brainrots.push(drop.brainrot);
-        spawnParticles(drop.x + drop.width / 2, drop.y + drop.height / 2, drop.brainrot.color, 18);
+        spawnParticles(drop.x + drop.width / 2, drop.y + drop.height / 2, drop.brainrot.color, 24, {
+          speed: 2.5,
+          gravity: 0.18,
+          image: drop.brainrot.image
+        });
         fallingBrainrots.splice(index, 1);
         renderFactory();
       }
@@ -787,7 +814,6 @@ function renderMenu() {
   document.getElementById("particle-toggle").checked = particleEffectsEnabled;
   document.getElementById("game-speed").value = String(gameSpeed);
 }
-
 
 // ------------------------------------------------------------
 // THE GAME LOOP

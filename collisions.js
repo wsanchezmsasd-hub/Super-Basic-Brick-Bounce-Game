@@ -16,7 +16,6 @@ function boxesTouch(a, b) {
   );
 }
 
-
 // The ball bounces off the left, right, and top walls.
 function bounceOffWalls(ball) {
   if (ball.x < 0) {
@@ -43,14 +42,39 @@ function bounceOffBottom(ball) {
   ball.vy = 0;
 }
 
-
-// A descending ball is caught and held for the next volley.
 function bounceOffPaddle(ball) {
-  if (boxesTouch(ball, paddle) && ball.vy > 0) {
-    ball.state = "held";
-    ball.vx = 0;
-    ball.vy = 0;
+  if (!boxesTouch(ball, paddle) || ball.vy <= 0) return;
+
+  const hitCenter = (ball.x + ball.width / 2) - (paddle.x + paddle.width / 2);
+  const maxHorizontal = 3.9;
+  const speedBoost = 1.55;
+
+  ball.state = "active";
+  ball.y = paddle.y - ball.height - 1;
+
+  const horizontalKick = Math.max(-maxHorizontal, Math.min(maxHorizontal, hitCenter / 8));
+  ball.vx = horizontalKick + ball.vx * 0.35;
+  ball.vy = -Math.abs(ball.vy || BALL_SPEED) * speedBoost;
+
+  const currentSpeed = Math.hypot(ball.vx, ball.vy);
+  if (currentSpeed < BALL_SPEED * 1.7) {
+    ball.vx *= 1.6;
+    ball.vy *= 1.35;
   }
+
+  spawnParticles(
+    ball.x + ball.width / 2,
+    ball.y + ball.height / 2,
+    "#ffff66",
+    36,
+    {
+      speed: 2.8,
+      gravity: 0.15,
+      image: randomBrainrotParticleSource()
+    }
+  );
+
+  return;
 }
 
 const PULL_RADIUS = BRICK_WIDTH * 4;
@@ -79,7 +103,7 @@ function spawnBrickBrainrotDrop(brick) {
   if (brick.adachiRei) {
     const brainrot = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      rarity: "SPECIAL",
+      rarity: "SECRET RARITY",
       name: "Hatsune miku Plush",
       defaultName: "Hatsune miku Plush",
       color: "#46c7f2",
@@ -102,41 +126,59 @@ function spawnBrickBrainrotDrop(brick) {
   if (brick.brainrotRarity) spawnBrainrotDrop(brick.brainrotRarity, brick);
 }
 
-
 // The ball bounces off blocks and damages the one it hits.
 function bounceOffBricks(ball) {
   for (let index = 0; index < bricks.length; index++) {
     const brick = bricks[index];
     if (!boxesTouch(ball, brick)) {
-      continue;  // not touching this brick, check the next one
+      continue;
     }
 
-    // How far has the ball pushed into the brick on each side?
     const overlapX = Math.min(ball.x + ball.width, brick.x + brick.width) - Math.max(ball.x, brick.x);
     const overlapY = Math.min(ball.y + ball.height, brick.y + brick.height) - Math.max(ball.y, brick.y);
 
     if (overlapX < overlapY) {
-      // The ball hit the brick's left or right side.
       ball.vx = -ball.vx;
       if (ball.x < brick.x) {
-        ball.x = brick.x - ball.width;     // left of the brick
+        ball.x = brick.x - ball.width;
       } else {
-        ball.x = brick.x + brick.width;    // right of the brick
+        ball.x = brick.x + brick.width;
       }
     } else {
-      // The ball hit the brick's top or bottom.
       ball.vy = -ball.vy;
-      if (ball.y < brick.y) {
-        ball.y = brick.y - ball.height;    // above the brick
+      if (ball.y < ball.y) {
+        ball.y = brick.y - ball.height;
       } else {
-        ball.y = brick.y + brick.height;   // below the brick
+        ball.y = brick.y + brick.height;
       }
     }
 
-    spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#fff45c", 5);
+    spawnParticles(
+      brick.x + brick.width / 2,
+      brick.y + brick.height / 2,
+      "#fff45c",
+      48,
+      {
+        speed: 3.4,
+        gravity: 0.18,
+        image: randomBrainrotParticleSource()
+      }
+    );
+
     brick.hitsRemaining -= 1;
     if (brick.hitsRemaining <= 0) {
-      spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, "#ff4cae", 22);
+      spawnParticles(
+        brick.x + brick.width / 2,
+        brick.y + brick.height / 2,
+        "#ff4cae",
+        70,
+        {
+          speed: 4.2,
+          gravity: 0.22,
+          image: randomBrainrotParticleSource()
+        }
+      );
+
       if (brick.effect === "ROW") {
         const rowBricks = bricks.filter((candidate) => candidate.y === brick.y);
         for (const rowBrick of rowBricks) {
@@ -163,7 +205,6 @@ function bounceOffBricks(ball) {
       }
       if (brick.effect === "FRENZY") frenzyTicksRemaining = FRENZY_DURATION_TICKS;
     }
-
-    break;  // bounce off one brick per update, then stop looking
+    break;
   }
 }

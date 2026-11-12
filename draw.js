@@ -52,15 +52,34 @@ function draw() {
 
 function drawParticles() {
   if (!particleEffectsEnabled) return;
+
   for (const particle of particles) {
-    ctx.globalAlpha = Math.min(1, particle.life / particle.maxLife);
-    ctx.fillStyle = particle.color;
-    ctx.shadowColor = particle.color;
-    ctx.shadowBlur = 10;
-    ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+    const alpha = Math.min(1, particle.life / particle.maxLife);
+    const image = particle.image ? getBrainrotImage(particle.image) : null;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    if (image && image.complete && image.naturalWidth > 0) {
+      ctx.drawImage(
+        image,
+        particle.x - particle.size / 2,
+        particle.y - particle.size / 2,
+        particle.size,
+        particle.size
+      );
+    } else {
+      ctx.fillStyle = particle.color || "#ffffff";
+      ctx.fillRect(
+        particle.x - particle.size / 2,
+        particle.y - particle.size / 2,
+        particle.size,
+        particle.size
+      );
+    }
+
+    ctx.restore();
   }
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
 }
 
 function drawBoardGuides() {
@@ -104,7 +123,6 @@ function drawHud() {
   ctx.textAlign = "right";
   ctx.fillStyle = "#ff64bb";
   ctx.fillText(`SCORE ${GameState.Score}`, WIDTH - 12, 24);
-  ctx.textAlign = "left";
   ctx.textAlign = "left";
 }
 

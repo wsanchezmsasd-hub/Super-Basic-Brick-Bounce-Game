@@ -30,6 +30,21 @@ document.addEventListener("keydown", function (event) {
   }
 });
 
+document.addEventListener("click", function (event) {
+  const clickedButton = event.target.closest("button");
+  if (!clickedButton) return;
+
+  const rect = clickedButton.getBoundingClientRect();
+  const clickX = rect.left + rect.width / 2;
+  const clickY = rect.top + rect.height / 2;
+
+  spawnParticles(clickX * (WIDTH / Math.max(1, canvas.getBoundingClientRect().width)), clickY * (HEIGHT / Math.max(1, canvas.getBoundingClientRect().height)), "#ffffff", 45, {
+    speed: 3.5,
+    gravity: 0.16,
+    image: randomBrainrotParticleSource()
+  });
+});
+
 function setShopOpen(open) {
   document.getElementById("shop-backdrop").hidden = !open;
   if (open) renderShop();
@@ -107,7 +122,6 @@ document.getElementById("upgrade-list").addEventListener("click", (event) => {
 document.addEventListener("keyup", function (event) {
   keys[event.key.toLowerCase()] = false;
 });
-
 window.addEventListener("blur", function () {
   for (const key of Object.keys(keys)) {
     keys[key] = false;
