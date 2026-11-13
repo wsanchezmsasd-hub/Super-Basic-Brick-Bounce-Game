@@ -54,7 +54,9 @@ function drawParticles() {
   if (!particleEffectsEnabled) return;
 
   for (const particle of particles) {
-    const alpha = Math.min(1, particle.life / particle.maxLife);
+    // Keep sprites visible for most of their lifetime, then fade them near the end.
+    const remainingLife = particle.life / particle.maxLife;
+    const alpha = Math.min(1, Math.max(0.7, remainingLife));
     const image = particle.image ? getBrainrotImage(particle.image) : null;
 
     ctx.save();

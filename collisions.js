@@ -136,21 +136,26 @@ function bounceOffBricks(ball) {
 
     const overlapX = Math.min(ball.x + ball.width, brick.x + brick.width) - Math.max(ball.x, brick.x);
     const overlapY = Math.min(ball.y + ball.height, brick.y + brick.height) - Math.max(ball.y, brick.y);
+    const ballCenterX = ball.x + ball.width / 2;
+    const ballCenterY = ball.y + ball.height / 2;
+    const brickCenterX = brick.x + brick.width / 2;
+    const brickCenterY = brick.y + brick.height / 2;
+    const cameFromSide = overlapX < overlapY;
 
-    if (overlapX < overlapY) {
-      ball.vx = -ball.vx;
-      if (ball.x < brick.x) {
+    if (cameFromSide) {
+      if (ballCenterX < brickCenterX) {
         ball.x = brick.x - ball.width;
+        ball.vx = -Math.abs(ball.vx);
       } else {
         ball.x = brick.x + brick.width;
+        ball.vx = Math.abs(ball.vx);
       }
+    } else if (ballCenterY < brickCenterY) {
+      ball.y = brick.y - ball.height;
+      ball.vy = -Math.abs(ball.vy);
     } else {
-      ball.vy = -ball.vy;
-      if (ball.y < ball.y) {
-        ball.y = brick.y - ball.height;
-      } else {
-        ball.y = brick.y + brick.height;
-      }
+      ball.y = brick.y + brick.height;
+      ball.vy = Math.abs(ball.vy);
     }
 
     spawnParticles(
@@ -161,6 +166,7 @@ function bounceOffBricks(ball) {
       {
         speed: 3.4,
         gravity: 0.18,
+        size: 14,
         image: randomBrainrotParticleSource()
       }
     );
@@ -175,6 +181,7 @@ function bounceOffBricks(ball) {
         {
           speed: 4.2,
           gravity: 0.22,
+          size: 16,
           image: randomBrainrotParticleSource()
         }
       );
@@ -187,13 +194,16 @@ function bounceOffBricks(ball) {
         addScore(rowBricks.length * 10);
         bricks = bricks.filter((candidate) => candidate.y !== brick.y);
       } else if (brick.effect === "WARP") {
-        const rowBricks = bricks.filter((candidate) => candidate.y === brick.y);
+        // The hit warp block is destroyed; the remaining bricks in its row shift.
+        const rowBricks = bricks.filter((candidate) => candidate.y === brick.y && candidate !== brick);
         for (const rowBrick of rowBricks) {
           const column = Math.round(rowBrick.x / BRICK_WIDTH);
           const columnSpan = Math.ceil(rowBrick.width / BRICK_WIDTH);
           const nextColumn = column + 1 + columnSpan > BRICK_COLUMNS ? 0 : column + 1;
           rowBrick.x = nextColumn * BRICK_WIDTH;
         }
+        const brickIndex = bricks.indexOf(brick);
+        if (brickIndex !== -1) bricks.splice(brickIndex, 1);
         addScore(10);
       } else {
         spawnBrickBrainrotDrop(brick);
